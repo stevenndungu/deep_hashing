@@ -1,0 +1,2 @@
+input_size,output_size,learning_rate,batch_size,epochs,mAP,alpha,model_type,props,margin
+,,,,,,,,,
