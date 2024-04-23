@@ -1,0 +1,1345 @@
+---
+title: "Image Retrieval"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: false
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: true
+    highlighting-style: github
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+
+.justify {
+  text-align: justify !important
+}
+
+/* Adjust width of the Quarto tab buttons */
+.panel-tabset .nav-link {
+    width: 250px; /* Adjust the width value to your preference */
+}
+
+
+</style>
+```
+
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2> Determination of the optimal threshold for mAP </h2>
+:::
+
+
+</br>
+
+### 
+
+
+::: {.panel-tabset}
+
+####  Model (8 bit)
+
+
+```{python}
+
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+from cosfire_workflow_utils import *
+df_training, df_testing, train_label_code, valid_label_code, _ = get_data(r"G:\My Drive\cosfire\COSFIREdescriptor.mat")
+
+dic_labels = { 2: 'Bent',
+                3: ' Compact',
+                 0: 'FRI',
+                 1: 'FRII'
+              }
+
+#rename 'label_name' to 'label_code'
+df_training.rename(columns={'label_name': 'label_code'}, inplace=True) 
+df_testing.rename(columns={'label_name': 'label_code'}, inplace=True)         
+df_training['label_name'] = df_training['label_code'].map(dic_labels)
+df_testing['label_name'] = df_testing['label_code'].map(dic_labels)
+
+
+df_training.drop('label_name', axis=1, inplace=True)
+df_testing.drop('label_name', axis=1, inplace=True)
+
+class CosfireNet(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(CosfireNet, self).__init__()
+        self.hd = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.Tanh(),
+            nn.Dropout(0.3),
+            nn.Linear(64, output_size),
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        return self.hd(x)
+    
+class CosfireDataset(Dataset):
+    def __init__(self, dataframe):
+        self.data = torch.tensor(dataframe.iloc[:, :-1].values, dtype=torch.float32)
+        self.labels = torch.tensor(dataframe.iloc[:, -1].values, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
+# Hyperparameters
+input_size = 200
+output_size = 36
+batch_size = 32
+
+
+###################################
+###       Evaluate              ###
+###################################
+
+model = CosfireNet(input_size, output_size)
+
+# Load the best model
+model_save_path = f'best_model_{output_size}_bit.pth'
+model = torch.load(model_save_path)
+model.eval()
+
+
+train_df, valid_df = train_test_split(df_training, test_size=0.1, random_state=42)
+
+valid_dataset = CosfireDataset(valid_df)
+valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(train_df)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+train_df['predictions'] = flat_predictions_train
+#train_df['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
+        valid_preds = model(valid_inputs)
+        predictions.append(valid_preds.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+valid_df['predictions'] = flat_predictions_test
+
+################################################################
+
+
+thresholds = list(range(0,100,5))#[30, 50, 55, 65, 70, 85, 90]#)
+# thresholds = np.linspace(50, 70, 50).tolist()
+# start = 55.714285714
+# end = 100
+# step = 0.408163265306122*10
+
+# numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
+
+# start = 0
+# end = 55.714285714
+# step = 0.408163265306122*10
+
+# numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
+
+
+#thresholds = numbers2 + numbers1
+
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold is: ', threshold_max_map)
+print('The Best Validation mAP is: ',maP)
+
+test_dataset = CosfireDataset(df_testing)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(df_training)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_training['predictions'] = flat_predictions_train
+#df_training['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for test_inputs, _ in tqdm(test_dataloader, desc='Predicting', leave=True):
+        test_outputs = model(test_inputs)
+        predictions.append(test_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_testing['predictions'] = flat_predictions_test
+
+
+maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+print('At the optimal threshold from Validation: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+</br>
+
+Test data
+
+
+```{python}
+
+thresholds = list(range(0,100,5))
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold based on Test data is: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+
+####  Model (16 bit)
+
+
+```{python}
+
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+from cosfire_workflow_utils import *
+df_training, df_testing, train_label_code, valid_label_code, _ = get_data(r"G:\My Drive\cosfire\COSFIREdescriptor.mat")
+
+dic_labels = { 2: 'Bent',
+                3: ' Compact',
+                 0: 'FRI',
+                 1: 'FRII'
+              }
+
+#rename 'label_name' to 'label_code'
+df_training.rename(columns={'label_name': 'label_code'}, inplace=True) 
+df_testing.rename(columns={'label_name': 'label_code'}, inplace=True)         
+df_training['label_name'] = df_training['label_code'].map(dic_labels)
+df_testing['label_name'] = df_testing['label_code'].map(dic_labels)
+
+
+df_training.drop('label_name', axis=1, inplace=True)
+df_testing.drop('label_name', axis=1, inplace=True)
+
+class CosfireNet(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(CosfireNet, self).__init__()
+        self.hd = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.Tanh(),
+            nn.Dropout(0.3),
+            nn.Linear(64, output_size),
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        return self.hd(x)
+    
+class CosfireDataset(Dataset):
+    def __init__(self, dataframe):
+        self.data = torch.tensor(dataframe.iloc[:, :-1].values, dtype=torch.float32)
+        self.labels = torch.tensor(dataframe.iloc[:, -1].values, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
+# Hyperparameters
+input_size = 200
+output_size = 16
+batch_size = 32
+
+
+###################################
+###       Evaluate              ###
+###################################
+
+model = CosfireNet(input_size, output_size)
+
+# Load the best model
+model_save_path = f'best_model_{output_size}_bit.pth'
+model = torch.load(model_save_path)
+model.eval()
+
+
+train_df, valid_df = train_test_split(df_training, test_size=0.1, random_state=42)
+
+valid_dataset = CosfireDataset(valid_df)
+valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(train_df)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+train_df['predictions'] = flat_predictions_train
+#train_df['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
+        valid_preds = model(valid_inputs)
+        predictions.append(valid_preds.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+valid_df['predictions'] = flat_predictions_test
+
+################################################################
+
+
+#thresholds = list(range(0,100,5))#[30, 50, 55, 65, 70, 85, 90]#)
+thresholds = np.linspace(50, 95, 100).tolist()
+# start = 55.714285714
+# end = 100
+# step = 0.408163265306122*10
+
+# numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
+
+# start = 0
+# end = 55.714285714
+# step = 0.408163265306122*10
+
+# numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
+
+
+#thresholds = numbers2 + numbers1
+
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold is: ', threshold_max_map)
+print('The Best Validation mAP is: ',maP)
+
+test_dataset = CosfireDataset(df_testing)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(df_training)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_training['predictions'] = flat_predictions_train
+#df_training['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for test_inputs, _ in tqdm(test_dataloader, desc='Predicting', leave=True):
+        test_outputs = model(test_inputs)
+        predictions.append(test_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_testing['predictions'] = flat_predictions_test
+
+
+maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+print('At the optimal threshold from Validation: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+</br>
+
+Test data
+
+
+```{python}
+
+#thresholds = list(range(0,100,5))
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold based on Test data is: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+
+####  Model (24 bit)
+
+
+```{python}
+
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+from cosfire_workflow_utils import *
+df_training, df_testing, train_label_code, valid_label_code, _ = get_data(r"G:\My Drive\cosfire\COSFIREdescriptor.mat")
+
+dic_labels = { 2: 'Bent',
+                3: ' Compact',
+                 0: 'FRI',
+                 1: 'FRII'
+              }
+
+#rename 'label_name' to 'label_code'
+df_training.rename(columns={'label_name': 'label_code'}, inplace=True) 
+df_testing.rename(columns={'label_name': 'label_code'}, inplace=True)         
+df_training['label_name'] = df_training['label_code'].map(dic_labels)
+df_testing['label_name'] = df_testing['label_code'].map(dic_labels)
+
+
+df_training.drop('label_name', axis=1, inplace=True)
+df_testing.drop('label_name', axis=1, inplace=True)
+
+class CosfireNet(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(CosfireNet, self).__init__()
+        self.hd = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.Tanh(),
+            nn.Dropout(0.3),
+            nn.Linear(64, output_size),
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        return self.hd(x)
+    
+class CosfireDataset(Dataset):
+    def __init__(self, dataframe):
+        self.data = torch.tensor(dataframe.iloc[:, :-1].values, dtype=torch.float32)
+        self.labels = torch.tensor(dataframe.iloc[:, -1].values, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
+# Hyperparameters
+input_size = 200
+output_size = 24
+batch_size = 32
+
+
+###################################
+###       Evaluate              ###
+###################################
+
+model = CosfireNet(input_size, output_size)
+
+# Load the best model
+model_save_path = f'best_model_{output_size}_bit.pth'
+model = torch.load(model_save_path)
+model.eval()
+
+
+train_df, valid_df = train_test_split(df_training, test_size=0.1, random_state=42)
+
+valid_dataset = CosfireDataset(valid_df)
+valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(train_df)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+train_df['predictions'] = flat_predictions_train
+#train_df['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
+        valid_preds = model(valid_inputs)
+        predictions.append(valid_preds.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+valid_df['predictions'] = flat_predictions_test
+
+################################################################
+
+
+thresholds = list(range(0,100,5))#[30, 50, 55, 65, 70, 85, 90]#)
+# thresholds = np.linspace(50, 70, 50).tolist()
+# start = 55.714285714
+# end = 100
+# step = 0.408163265306122*10
+
+# numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
+
+# start = 0
+# end = 55.714285714
+# step = 0.408163265306122*10
+
+# numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
+
+
+#thresholds = numbers2 + numbers1
+
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold is: ', threshold_max_map)
+print('The Best Validation mAP is: ',maP)
+
+test_dataset = CosfireDataset(df_testing)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(df_training)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_training['predictions'] = flat_predictions_train
+#df_training['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for test_inputs, _ in tqdm(test_dataloader, desc='Predicting', leave=True):
+        test_outputs = model(test_inputs)
+        predictions.append(test_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_testing['predictions'] = flat_predictions_test
+
+
+maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+print('At the optimal threshold from Validation: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+</br>
+
+Test data
+
+
+```{python}
+
+thresholds = list(range(0,100,5))
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold based on Test data is: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+
+####  Model (32 bit)
+
+
+```{python}
+
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+from cosfire_workflow_utils import *
+df_training, df_testing, train_label_code, valid_label_code, _ = get_data(r"G:\My Drive\cosfire\COSFIREdescriptor.mat")
+
+dic_labels = { 2: 'Bent',
+                3: ' Compact',
+                 0: 'FRI',
+                 1: 'FRII'
+              }
+
+#rename 'label_name' to 'label_code'
+df_training.rename(columns={'label_name': 'label_code'}, inplace=True) 
+df_testing.rename(columns={'label_name': 'label_code'}, inplace=True)         
+df_training['label_name'] = df_training['label_code'].map(dic_labels)
+df_testing['label_name'] = df_testing['label_code'].map(dic_labels)
+
+
+df_training.drop('label_name', axis=1, inplace=True)
+df_testing.drop('label_name', axis=1, inplace=True)
+
+class CosfireNet(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(CosfireNet, self).__init__()
+        self.hd = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.Tanh(),
+            nn.Dropout(0.3),
+            nn.Linear(64, output_size),
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        return self.hd(x)
+    
+class CosfireDataset(Dataset):
+    def __init__(self, dataframe):
+        self.data = torch.tensor(dataframe.iloc[:, :-1].values, dtype=torch.float32)
+        self.labels = torch.tensor(dataframe.iloc[:, -1].values, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
+# Hyperparameters
+input_size = 200
+output_size = 32
+batch_size = 32
+
+
+###################################
+###       Evaluate              ###
+###################################
+
+model = CosfireNet(input_size, output_size)
+
+# Load the best model
+model_save_path = f'best_model_{output_size}_bit.pth'
+model = torch.load(model_save_path)
+model.eval()
+
+
+train_df, valid_df = train_test_split(df_training, test_size=0.1, random_state=42)
+
+valid_dataset = CosfireDataset(valid_df)
+valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(train_df)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+train_df['predictions'] = flat_predictions_train
+#train_df['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
+        valid_preds = model(valid_inputs)
+        predictions.append(valid_preds.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+valid_df['predictions'] = flat_predictions_test
+
+################################################################
+
+
+thresholds = list(range(0,100,5))#[30, 50, 55, 65, 70, 85, 90]#)
+# thresholds = np.linspace(50, 70, 50).tolist()
+# start = 55.714285714
+# end = 100
+# step = 0.408163265306122*10
+
+# numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
+
+# start = 0
+# end = 55.714285714
+# step = 0.408163265306122*10
+
+# numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
+
+
+#thresholds = numbers2 + numbers1
+
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold is: ', threshold_max_map)
+print('The Best Validation mAP is: ',maP)
+
+test_dataset = CosfireDataset(df_testing)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(df_training)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_training['predictions'] = flat_predictions_train
+#df_training['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for test_inputs, _ in tqdm(test_dataloader, desc='Predicting', leave=True):
+        test_outputs = model(test_inputs)
+        predictions.append(test_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_testing['predictions'] = flat_predictions_test
+
+
+maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+print('At the optimal threshold from Validation: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+</br>
+
+Test data
+
+
+```{python}
+
+thresholds = list(range(0,100,5))
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold based on Test data is: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+
+#### Model (36 bit)
+
+
+```{python}
+
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+from cosfire_workflow_utils import *
+df_training, df_testing, train_label_code, valid_label_code, _ = get_data(r"G:\My Drive\cosfire\COSFIREdescriptor.mat")
+
+dic_labels = { 2: 'Bent',
+                3: ' Compact',
+                 0: 'FRI',
+                 1: 'FRII'
+              }
+
+#rename 'label_name' to 'label_code'
+df_training.rename(columns={'label_name': 'label_code'}, inplace=True) 
+df_testing.rename(columns={'label_name': 'label_code'}, inplace=True)         
+df_training['label_name'] = df_training['label_code'].map(dic_labels)
+df_testing['label_name'] = df_testing['label_code'].map(dic_labels)
+
+
+df_training.drop('label_name', axis=1, inplace=True)
+df_testing.drop('label_name', axis=1, inplace=True)
+
+class CosfireNet(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(CosfireNet, self).__init__()
+        self.hd = nn.Sequential(
+            nn.Linear(input_size, 128),
+            nn.BatchNorm1d(128),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64),
+            nn.Tanh(),
+            nn.Dropout(0.3),
+            nn.Linear(64, output_size),
+            nn.Tanh()
+        )
+
+    def forward(self, x):
+        return self.hd(x)
+    
+class CosfireDataset(Dataset):
+    def __init__(self, dataframe):
+        self.data = torch.tensor(dataframe.iloc[:, :-1].values, dtype=torch.float32)
+        self.labels = torch.tensor(dataframe.iloc[:, -1].values, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
+# Hyperparameters
+input_size = 200
+output_size = 8
+batch_size = 32
+
+
+###################################
+###       Evaluate              ###
+###################################
+
+model = CosfireNet(input_size, output_size)
+
+# Load the best model
+model_save_path = f'best_model_{output_size}_bit.pth'
+model = torch.load(model_save_path)
+model.eval()
+
+
+train_df, valid_df = train_test_split(df_training, test_size=0.1, random_state=42)
+
+valid_dataset = CosfireDataset(valid_df)
+valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(train_df)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+train_df['predictions'] = flat_predictions_train
+#train_df['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
+        valid_preds = model(valid_inputs)
+        predictions.append(valid_preds.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+valid_df['predictions'] = flat_predictions_test
+
+################################################################
+
+
+thresholds = list(range(0,100,5))#[30, 50, 55, 65, 70, 85, 90]#)
+# thresholds = np.linspace(50, 70, 50).tolist()
+# start = 55.714285714
+# end = 100
+# step = 0.408163265306122*10
+
+# numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
+
+# start = 0
+# end = 55.714285714
+# step = 0.408163265306122*10
+
+# numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
+
+
+#thresholds = numbers2 + numbers1
+
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold is: ', threshold_max_map)
+print('The Best Validation mAP is: ',maP)
+
+test_dataset = CosfireDataset(df_testing)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(df_training)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+
+
+# %%
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_training['predictions'] = flat_predictions_train
+#df_training['label_code'] = train_label_code
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for test_inputs, _ in tqdm(test_dataloader, desc='Predicting', leave=True):
+        test_outputs = model(test_inputs)
+        predictions.append(test_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+df_testing['predictions'] = flat_predictions_test
+
+
+maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+print('At the optimal threshold from Validation: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+</br>
+
+Test data
+
+
+```{python}
+
+thresholds = list(range(0,100,5))
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold based on Test data is: ', threshold_max_map)
+print('The Test mAP is: ',maP)
+```
+
+:::
+:::
