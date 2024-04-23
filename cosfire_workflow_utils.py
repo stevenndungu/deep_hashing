@@ -91,7 +91,7 @@ def SimplifiedTopMap(rB, qB, retrievalL, queryL, topk):
   return np.round(np.mean(mAP),4) *100 #mAP
 
 
-def mAP_values(r_database,q_database, thresh = 0.5, percentile = True):
+def mAP_values(r_database,q_database, thresh = 0.5, percentile = True, topk = 100):
     if percentile:
         r_binary = np.array([((out >= np.percentile(out,thresh))*1).tolist()  for _, out in enumerate(r_database.predictions)])
         q_binary = np.array([((out >= np.percentile(out,thresh))*1).tolist()  for _, out in enumerate(q_database.predictions)])
@@ -106,7 +106,7 @@ def mAP_values(r_database,q_database, thresh = 0.5, percentile = True):
     qB = q_binary
     retrievalL = train_label
     queryL = valid_label
-    topk = 100
+    topk = topk
     mAP = SimplifiedTopMap(rB, qB, retrievalL, queryL, topk)
   
     return np.round(mAP,4), r_binary, train_label, q_binary, valid_label
