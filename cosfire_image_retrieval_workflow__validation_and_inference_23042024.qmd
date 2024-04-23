@@ -120,8 +120,6 @@ data_preview.columns = ['descrip_1', 'descrip_2', 'descrip_3', 'descrip_4', 'des
        'galaxy']
 df_training_new = pd.concat([df_training,df_testing], ignore_index=True)
 
-train_label_code = df_training['label_code']
-test_label_code = df_testing['label_code']
 
 df_training.drop('label_name', axis=1, inplace=True)
 df_testing.drop('label_name', axis=1, inplace=True)
@@ -263,9 +261,12 @@ where AP represents the average precision of one query, with $n$ being the total
 
 ::: {.panel-tabset}
 
-####  mAP Curve
+####  Model Validation
+
+Model performance based on validation data
 
 ```{python}
+
 class CosfireNet(nn.Module):
     def __init__(self, input_size, output_size):
         super(CosfireNet, self).__init__()
@@ -345,40 +346,25 @@ predictions = []
 # Perform predictions on the testing set
 with torch.no_grad():
     for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
-        test_outputs = model(valid_inputs)
-        predictions.append(test_outputs.numpy())
+        valid_preds = model(valid_inputs)
+        predictions.append(valid_preds.numpy())
 
 # Flatten the predictions
 flat_predictions_test = [item for sublist in predictions for item in sublist]
 
 # Append predictions to the df_testing DataFrame
 valid_df['predictions'] = flat_predictions_test
-#valid_df['label_code'] = test_label_code
+
 ################################################################
 
 
 thresholds = list(range(0,100,5))#[30, 50, 55, 65, 70, 85, 90]#)
 # thresholds = np.linspace(50, 70, 50).tolist()
-# start = 55.714285714
-# end = 100
-# step = 0.408163265306122*10
-
-# numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
-
-# start = 0
-# end = 55.714285714
-# step = 0.408163265306122*10
-
-# numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
-
-
-#thresholds = numbers2 + numbers1
-
 
 mAP_results = []
 for _,thresh in enumerate(thresholds):
 
-  maP,train_binary, train_label, test_binary, test_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
   mAP_results.append(maP)
 
 
@@ -394,85 +380,23 @@ max_map_index = df['mAP'].idxmax()
 # Retrieve the threshold corresponding to the maximum mAP
 threshold_max_map = df.loc[max_map_index, 'threshold']
 
-maP,train_binary, train_label, test_binary, test_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
 
-print('The Best Validation mAP is: ',maP)
-```
-
-
-
-
-
-```{python}
 # Plot the line curve
 plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
 plt.xlabel('Threshold (Percentile)')
 plt.ylabel('mAP')
 plt.show()
 
-
+print('The optimal threshold is: ', threshold_max_map)
+print('The Best Validation mAP is: ',maP)
 ```
 
+#### Model Testing
 
-####  mAP vs topk images
-```{python}
-
-output_sizes = [8,16,24,32,36,48,64,72]
-df_mAPs = pd.DataFrame(columns = ['topk_number_images', 'mAP', 'bit_size'])
-for _, output_size in enumerate(output_sizes):
-   df = pd.read_csv(f'mAP_vs_topk_images_{output_size}bit.csv')
-   df['bit_size'] = str(output_size)
-   df_mAPs = pd.concat([df_mAPs, df])
-
-# Plot the line curve
-sns.lineplot(x='topk_number_images', y='mAP', data=df_mAPs, hue='bit_size')
-plt.axhline(y=1, color='w', linestyle='-') # added to make the axis begin from 0 - trick:)
-plt.xlabel('Top k number of images')
-plt.ylabel('mAP')
-plt.show()
-
-```
-
-
-
-#### Bit Size Comparisons
+Now applying the same model (best model from the validation data) to the test data with the best threshold as per the validation data.
 
 ```{python}
-# df_top_mAP = df.sort_values(by="mAP", ascending=False).head(10)
-# display(Markdown(df_top_mAP.to_markdown(index = True)))
-data = {'bit': ['8_bit', '16_bit', '24_bit', '32_bit', '36_bit', '48_bit', '64_bit', '72_bit'],
-        'mAP': [60.68, 60.12, 76.12, 91.76,93.06, 91.97, 91.41,90.77]}
-df = pd.DataFrame(data)
-
-# Create the bar plot
-plt.figure(figsize=(10, 6))
-plt.bar(df['bit'], df['mAP'])
-#plt.ylim(50,100)
-
-# Add value labels to the bars
-for i, v in enumerate(df['mAP']):
-    if df['bit'][i] in ['8_bit', '16_bit', '24_bit']:
-        color = 'red'
-    else:
-        color = 'black'
-    plt.text(i, v + 0.5, str(v), ha='center', color=color)
-
-
-# Set the plot title and labels
-plt.title('mAP Values for Different Bit sizes')
-plt.xlabel('Bit Size')
-plt.ylabel('mAP')
-
-# Display the plot
-plt.show()
-```
-
-:::
-
-### Model Testing
-
-```{python}
-
 test_dataset = CosfireDataset(df_testing)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
@@ -496,7 +420,7 @@ flat_predictions_train = [item for sublist in predictions for item in sublist]
 
 # Append predictions to the df_testing DataFrame
 df_training['predictions'] = flat_predictions_train
-#df_training['label_code'] = train_label_code
+
 #################################################################
 
 # Lists to store predictions
@@ -513,19 +437,52 @@ flat_predictions_test = [item for sublist in predictions for item in sublist]
 
 # Append predictions to the df_testing DataFrame
 df_testing['predictions'] = flat_predictions_test
-#df_testing['label_code'] = test_label_code
+
 
 maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
 
+print('At the optimal threshold: ', threshold_max_map)
 print('The Test mAP is: ',maP)
 ```
 
 
-### Visualize the Predictions
+
+
+####  mAP vs topk Images
+
+We apply this on Test data
+
+```{python}
+
+topk_number_images = list(range(90,1180,10)) + [1180]
+mAP_tok = []
+for _, topk in enumerate(topk_number_images):
+   maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True,topk = topk)
+   mAP_tok.append(maP)
+
+
+data = {'topk_number_images': topk_number_images,
+        'mAP': mAP_tok}
+df = pd.DataFrame(data)
+df.to_csv(f'mAP_vs_topk_images_bit_{input_size}.csv', index = False)
+
+# Plot the line curve
+sns.lineplot(x='topk_number_images', y='mAP', data=df, color = 'r')
+plt.xlabel('Top k number of images')
+plt.ylabel('mAP')
+plt.show()
+
+```
+:::
+
+
+
+
+### Model Predictions overview
 
 ::: {.panel-tabset}
 
-####  Test predictions per class
+####  Test predictions
 
 ```{python}
 dic_labels_rev = { 2:'Bent',
@@ -574,7 +531,7 @@ for j in range(1,400,20):
 display(Markdown(df.to_markdown(index = True)))
 ```
 
-####  Train predictions per class
+####  Train predictions
 
 ```{python}
 
@@ -617,7 +574,7 @@ for j in range(1,1180,50):
 display(Markdown(df.to_markdown(index = True)))
 ```
 
-####  T-SNE projection of the last layer - Test data 
+####  T-SNE projection (Test) 
 
 ```{python}
 # %%
@@ -645,7 +602,7 @@ plt.close()
 ```
 
 
-####  T-SNE projection of the last layer - Train data 
+####  T-SNE projection (Train) 
 
 ```{python}
 
@@ -672,7 +629,7 @@ plt.show()
 plt.close()
 ```
 
-####  T-SNE projection of the last layer - Test & Train data 
+####  T-SNE projection (Test & Train) 
 ```{python}
 array_dat = []
 for i in range(df_training['predictions'].shape[0]):
@@ -823,5 +780,64 @@ query_image(test_image_index = random.randint(310, 400))
 
 </br>
 
+### Further Analyses
 
+Preliminary analyses: Model comparisons while using different bit sizes.
+
+::: {.panel-tabset}
+
+####  mAP vs topk images
+```{python}
+
+output_sizes = [8,16,24,32,36,48,64,72]
+df_mAPs = pd.DataFrame(columns = ['topk_number_images', 'mAP', 'bit_size'])
+for _, output_size in enumerate(output_sizes):
+   df = pd.read_csv(f'mAP_vs_topk_images_{output_size}bit.csv')
+   df['bit_size'] = str(output_size)
+   df_mAPs = pd.concat([df_mAPs, df])
+
+# Plot the line curve
+sns.lineplot(x='topk_number_images', y='mAP', data=df_mAPs, hue='bit_size')
+plt.axhline(y=1, color='w', linestyle='-') # added to make the axis begin from 0 - trick:)
+plt.xlabel('Top k number of images')
+plt.ylabel('mAP')
+plt.show()
+
+```
+
+
+
+#### Bit Size Comparisons
+
+```{python}
+# df_top_mAP = df.sort_values(by="mAP", ascending=False).head(10)
+# display(Markdown(df_top_mAP.to_markdown(index = True)))
+data = {'bit': ['8_bit', '16_bit', '24_bit', '32_bit', '36_bit', '48_bit', '64_bit', '72_bit'],
+        'mAP': [60.68, 60.12, 76.12, 91.76,93.06, 91.97, 91.41,90.77]}
+df = pd.DataFrame(data)
+
+# Create the bar plot
+plt.figure(figsize=(10, 6))
+plt.bar(df['bit'], df['mAP'])
+#plt.ylim(50,100)
+
+# Add value labels to the bars
+for i, v in enumerate(df['mAP']):
+    if df['bit'][i] in ['8_bit', '16_bit', '24_bit']:
+        color = 'red'
+    else:
+        color = 'black'
+    plt.text(i, v + 0.5, str(v), ha='center', color=color)
+
+
+# Set the plot title and labels
+plt.title('mAP Values for Different Bit sizes')
+plt.xlabel('Bit Size')
+plt.ylabel('mAP')
+
+# Display the plot
+plt.show()
+```
+
+:::
 :::
