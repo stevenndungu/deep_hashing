@@ -69,7 +69,6 @@ def DSHLoss(u, y, alpha, margin):
     y = y.int()
     # Create a duplicate y_label
     y = y.unsqueeze(1).expand(len(y),len(y))
-    #y = torch.Tensor(np.tile(np.array([np.array(Y)]).transpose(), (1, len(y))))
     y_label = torch.ones_like(torch.empty(len(y), len(y)))
     y_label[y == y.t()] = 0
 
@@ -86,7 +85,7 @@ def DSHLoss(u, y, alpha, margin):
 
 
 
-# Grid search parameters
+#List of Grid search parameters to iterate over
 learning_rate_values = [0.01]
 alphas = [1e-5]
 
@@ -122,7 +121,7 @@ def run():
 
             # Variables to keep track of the best model
             # best_val_loss = float('inf')
-            # best_model_path = 'best_model1.pth'
+            # best_model_path = 'best_model.pth'
 
             # Training loop
             for _ in tqdm(range(epochs), desc='Training Progress', leave=True):
@@ -169,7 +168,7 @@ def run():
             #model = CosfireNet(input_size, output_size)
 
             # Load the best model
-            # best_model_path = 'best_model1.pth'
+            # best_model_path = 'best_model.pth'
             # model.load_state_dict(torch.load(best_model_path))
             model.eval()
 
@@ -215,7 +214,7 @@ def run():
 
 
             thresholds = list(range(0,105,5))#[30, 50, 55, 65, 70, 85, 90]#)
-            #thresholds = np.linspace(0.1, 1, 10).tolist()
+            
             mAP_results = []
             for _,thresh in enumerate(thresholds):
                 maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True)
@@ -263,8 +262,4 @@ if __name__ == '__main__' :
     run()
     
     
-    
-
-
-# %%
 
