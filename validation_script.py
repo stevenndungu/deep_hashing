@@ -263,11 +263,8 @@ def run():
                             df = pd.read_csv("model_selection - validation.csv")
                             results_df = pd.concat([df, results_df], ignore_index=True)
                             results_df.to_csv('model_selection - validation.csv', index=False)
-                        break
-                    break
-                break
-            break
-        break
+                        
+  
 
 if __name__ == '__main__' :
     run()
