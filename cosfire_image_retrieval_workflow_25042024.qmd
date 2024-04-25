@@ -1,30 +1,28 @@
 ---
-title: "Image Retrieval"
+title: "Image Retrieval - COSFIRE APPROACH"
 date: today
 date-format: long
-author: "Steven  Ndung'u et al."
+author: "Steven et al."
 format:
   html:
-    toc: false
+    toc: true
     toc-depth: 3
     toc-location: left
     page-layout: full
     theme:
           light: flatly
           dark: darkly
-    number-sections: false
-    highlighting: true
+    number-sections: true
     smooth-scroll: true
     code-fold: true
     highlighting-style: github
-    self-contained: true
+    self-contained: false
 execute:
     echo: true
     warning: false
     enable: true
 
 title-block-banner: true
-
 ---
 
 ```{=html}
@@ -66,7 +64,7 @@ h4.date { /* Header 4 - and the author and data headers use this too  */
 :::{.column-page}
 
 ::: {style="text-align:center"}
-<h2>Image Retrieval by Hashing - COSFIRE Descriptors Approach  </h2>
+<h2>Image Retrieval by Hashing </h2>
 :::
 
 
@@ -97,6 +95,7 @@ The dataframe stores these image descriptor vectors, with each row representing 
 :::
 
 ```{python}
+
 
 #$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
 from cosfire_workflow_utils import *
@@ -131,7 +130,9 @@ display(Markdown(data_preview.to_markdown(index = True)))
 ```
 
 ### Model Training
+
 ::: {.justify}
+
 #### Loss function
 
 Let $\Omega$ represent the COSFIRE descriptor embedding space for radio galaxy images. The objective is to discover a mapping function $F : \Omega → {+1, −1}^{k}$ that translates the embedding space to a k-bit binary code space. This mapping should be learned in such a way that visually or semantically similar radio galaxy images are assigned binary codes that are close to each other, while dissimilar images are mapped to binary codes that are far apart in the binary code space. 
@@ -171,63 +172,7 @@ Suppose that there are N training pairs randomly selected from the training imag
 Regularization: To reduce the discrepancy between Euclidean space and the Hamming space a commonly used relaxation scheme is to utilize sigmoid or tanh function to approximate the thresholding procedure. A regularizer is applied to help obtain real-valued network outputs (from sigmoid/tanh/relu etc) to approach the desired discrete binary-like values (e.g 0,1).
 :::
 
- 
-
-```{python}
-#| echo: true
-#| output: true
-#| code-fold: false
-def DSHLoss(u, y,alpha, margin):
-      # m > 0 is a margin. The margin defines a radius around X1,X2. Dissimilar pairs contribute to the loss
-    # function only if their distance is within this radius
-    m = 2 * margin  
-    y = y.int()
-    # Create a duplicate y_label to form an N X N matrix
-    #aim: # y = 0 if they are similar, and y = 1 otherwise 
-    y = y.unsqueeze(1).expand(len(y),len(y))
-    y_label = torch.ones_like(torch.empty(len(y), len(y)))
-    y_label[y == y.t()] = 0
-
-    dist = torch.cdist(u, u, p=2).pow(2)
-    loss1 = 0.5 * (1 - y_label) * dist
-    loss2 = 0.5 * y_label * torch.clamp(m - dist, min=0)
-
-    B1 = torch.norm(torch.abs(u) - 1, p=1, dim=1)
-    # create an N X N matrix to help in creating the pairs in the subsequent step  
-    B2 = B1.unsqueeze(1).expand(len(y), len(y))
-    #add across the pairs - a transpose is required in order to have pair additions.
-    loss3 = (B2 + B2.t()) * alpha
-    minibatch_loss = torch.mean(loss1 + loss2 + loss3)
-    return minibatch_loss
-
-```
-
-
-#### Model
-
 We train a simple MLP network architecture. By optimizing this loss, the neural network learns to transform the input into a latent feature space that accentuates similarities and differences critical for distinguishing images effectively. The resulting model provides an end-to-end learning pipeline from raw image inputs to a k(36)-bit compact hash code amenable for efficient image retrieval and matching. Our experiments demonstrate the potential of this straightforward architecture and training approach for image hashing.
-
-The model is built by creating a sequential stack of linear layers, batch normalization layers, and activation functions. It takes an input of size of 200 vector embeddings, passes it through two linear layers with 128 and 64 units respectively, applies batch normalization and Tanh activation function, it also includes a dropout layer with a probability of 0.3 for regularization, and finally outputs a tensor of size output_size after applying another Tanh activation function.
-
-```{python}
-#| echo: true
-#| output: true
-#| code-fold: false
-class CosfireNet(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(CosfireNet, self).__init__()
-        self.hd = nn.Sequential(
-            nn.Linear(input_size, 128),
-            nn.BatchNorm1d(128),
-            nn.Linear(128, 64),
-            nn.BatchNorm1d(64),
-            nn.Tanh(),
-            nn.Dropout(0.3),
-            nn.Linear(64, output_size),
-            nn.Tanh()
-        )
-
-```
 
 ### Binarization and Mean Average Precision (mAP)
 
@@ -257,16 +202,7 @@ where AP represents the average precision of one query, with $n$ being the total
 :::
 :::
 
-
-
-::: {.panel-tabset}
-
-####  Model Validation
-
-Model performance based on validation data
-
 ```{python}
-
 class CosfireNet(nn.Module):
     def __init__(self, input_size, output_size):
         super(CosfireNet, self).__init__()
@@ -305,110 +241,154 @@ epochs = 600
 props = 0.1
 margin = 24
 
+train_df, valid_df = train_test_split(df_training, test_size=props, random_state=42)
 
+# Create DataLoader for train and test set
+train_dataset = CosfireDataset(train_df)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+valid_dataset = CosfireDataset(valid_df)
+test_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+# Instantiate CosfireNet
+model = CosfireNet(input_size, output_size)
+
+def DSHLoss(u, y,alpha, margin):
+      # m > 0 is a margin. The margin defines a radius around X1,X2. Dissimilar pairs contribute to the loss
+    # function only if their distance is within this radius
+    m = 2 * margin  
+    
+    y = y.int()
+
+    # Create a duplicate y_label to form an N X N matrix
+    #y = torch.Tensor(np.tile(np.array([np.array(Y)]).transpose(), (1, len(y))))
+    y = y.unsqueeze(1).expand(len(y),len(y))
+    y_label = torch.ones_like(torch.empty(len(y), len(y)))
+    y_label[y == y.t()] = 0
+
+    dist = torch.cdist(u, u, p=2).pow(2)
+    loss1 = 0.5 * (1 - y_label) * dist
+    loss2 = 0.5 * y_label * torch.clamp(m - dist, min=0)
+
+    B1 = torch.norm(torch.abs(u) - 1, p=1, dim=1)
+    B2 = B1.unsqueeze(1).expand(len(y), len(y))
+
+    loss3 = (B2 + B2.t()) * alpha
+    minibatch_loss = torch.mean(loss1 + loss2 + loss3)
+    return minibatch_loss
+
+
+
+################################################################################
+############
+################################################################################
+
+
+#%%
+################################################################################
+############
+################################################################################
+
+
+optimizer = optim.RMSprop(model.parameters(), lr=learning_rate)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.95)
+
+# Lists to store training and validation losses
+train_losses = []
+val_losses = []
+
+# Variables to keep track of the best model
+#best_val_loss = float('inf')
+
+# Training loop
+
+
+for epoch in tqdm(range(epochs), desc='Training Progress', leave=True):
+    model.train()
+    total_train_loss = 0.0
+    for _, (inputs, labels) in enumerate(train_dataloader):
+        # Before the backward pass, use the optimizer object to zero all of the
+        # gradients for the variables it will update (which are the learnable
+        # weights of the model). This is because by default, gradients are
+        # accumulated in buffers( i.e, not overwritten) whenever .backward()
+        optimizer.zero_grad()
+        u = model(inputs)
+        loss = DSHLoss(u = u, y=labels, alpha = alpha, margin = margin)
+        # Backward pass: compute gradient of the loss with respect to model parameters
+        loss.backward()
+        # Calling the step function on an Optimizer makes an update to its  parameters
+        optimizer.step()
+        total_train_loss += loss.item()
+    #It has been well established that you can achieve increased performance and faster 
+    # training on some problems by using a learning rate that changes during training.
+    scheduler.step() #optimizer.param_groups[0]['lr']  - updates the lr after every epoch.
+
+    # Calculate average training loss
+    average_train_loss = total_train_loss / len(train_dataloader)
+    train_losses.append(average_train_loss)
+
+
+    # Validation loop
+    model.eval()
+    features = []
+    total_val_loss = 0.0
+    
+    with torch.no_grad():
+        for val_inputs, val_labels in test_dataloader:
+         
+            val_outputs = model(val_inputs)
+            features.append(u)
+            val_loss = DSHLoss(u = val_outputs, y = val_labels, alpha = alpha, margin = margin)
+            total_val_loss += val_loss.item()
+
+    # Calculate average validation loss
+    average_val_loss = total_val_loss / len(test_dataloader)
+    val_losses.append(average_val_loss)
+
+    # Save the model if it is the best so far
+   #  if average_val_loss < best_val_loss:
+   #    best_val_loss = average_val_loss
+   #    model_save_path = 'best_model_mAP_93_06.pth'
+   #    torch.save(model, model_save_path)
+model_save_path = f'best_model_{output_size}_bit.pth'
+torch.save(model, model_save_path)
+# Plotting the training and validation loss curves
+plt.plot(range(1, epochs + 1), train_losses, label='Training Loss')
+plt.plot(range(1, epochs + 1), val_losses, label='Validation Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss Curves')
+plt.legend()
+plt.show()
+
+
+```
+
+```{python}
 ###################################
 ###       Evaluate              ###
 ###################################
 
-model = CosfireNet(input_size, output_size)
+#model = CosfireNet(input_size, output_size)
 
 # Load the best model
-model_save_path = 'best_model_mAP_93_06.pth'
+#best_model_path = 'best_model1.pth'
 model = torch.load(model_save_path)
 model.eval()
 
-
-train_df, valid_df = train_test_split(df_training, test_size=0.1, random_state=42)
-
-valid_dataset = CosfireDataset(valid_df)
-valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
-
-train_dataset = CosfireDataset(train_df)
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-
-
-# %%
-# Lists to store predictions
-predictions = []
-
-# Perform predictions on the testing set
-with torch.no_grad():
-    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
-        train_outputs = model(train_inputs)
-        predictions.append(train_outputs.numpy())
-
-# Flatten the predictions
-flat_predictions_train = [item for sublist in predictions for item in sublist]
-
-# Append predictions to the df_testing DataFrame
-train_df['predictions'] = flat_predictions_train
-#train_df['label_code'] = train_label_code
-#################################################################
-
-# Lists to store predictions
-predictions = []
-
-# Perform predictions on the testing set
-with torch.no_grad():
-    for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
-        valid_preds = model(valid_inputs)
-        predictions.append(valid_preds.numpy())
-
-# Flatten the predictions
-flat_predictions_test = [item for sublist in predictions for item in sublist]
-
-# Append predictions to the df_testing DataFrame
-valid_df['predictions'] = flat_predictions_test
-
-################################################################
-
-
-thresholds = list(range(0,100,5))#[30, 50, 55, 65, 70, 85, 90]#)
-# thresholds = np.linspace(50, 70, 50).tolist()
-
-mAP_results = []
-for _,thresh in enumerate(thresholds):
-
-  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
-  mAP_results.append(maP)
-
-
-
-data = {'mAP': mAP_results,
-        'threshold': thresholds}
-
-df = pd.DataFrame(data)
-
-# Find the index of the maximum mAP value
-max_map_index = df['mAP'].idxmax()
-
-# Retrieve the threshold corresponding to the maximum mAP
-threshold_max_map = df.loc[max_map_index, 'threshold']
-
-maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
-
-# Plot the line curve
-plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
-plt.xlabel('Threshold (Percentile)')
-plt.ylabel('mAP')
-plt.show()
-
-print('The optimal threshold is: ', threshold_max_map)
-print('The Best Validation mAP is: ',maP)
-```
-
-#### Model Testing
-
-Now applying the same model (best model from the validation data) to the test data with the best threshold as per the validation data.
-
-```{python}
 test_dataset = CosfireDataset(df_testing)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 train_dataset = CosfireDataset(df_training)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 
+dic_labels = { 2: 'Bent',
+                3: ' Compact',
+                 0: 'FRI',
+                 1: 'FRII'
+              }
 
+df_training['labels'] = df_training['label_name'].map(dic_labels)
+df_testing['labels'] = df_testing['label_name'].map(dic_labels)
 
 # %%
 # Lists to store predictions
@@ -425,7 +405,7 @@ flat_predictions_train = [item for sublist in predictions for item in sublist]
 
 # Append predictions to the df_testing DataFrame
 df_training['predictions'] = flat_predictions_train
-
+df_training['label_code'] = train_label_code
 #################################################################
 
 # Lists to store predictions
@@ -442,74 +422,79 @@ flat_predictions_test = [item for sublist in predictions for item in sublist]
 
 # Append predictions to the df_testing DataFrame
 df_testing['predictions'] = flat_predictions_test
+df_testing['label_code'] = test_label_code
+################################################################
 
 
-maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
+#thresholds = list(range(50,100,0.5))#[30, 50, 55, 65, 70, 85, 90]#)
+#thresholds = np.linspace(50, 70, 50).tolist()
+start = 55.714285714
+end = 100
+step = 0.408163265306122*10
 
-print('At the optimal threshold: ', threshold_max_map)
-print('The Test mAP is: ',maP)
-```
+numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
 
+start = 0
+end = 55.714285714
+step = 0.408163265306122*10
 
-
-
-####  mAP vs topk Images
-
-We apply this on Test data
-
-```{python}
-
-topk_number_images = list(range(90,1180,10)) + [1180]
-mAP_tok = []
-for _, topk in enumerate(topk_number_images):
-   maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True,topk = topk)
-   mAP_tok.append(maP)
+numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
 
 
-data = {'topk_number_images': topk_number_images,
-        'mAP': mAP_tok}
-df = pd.DataFrame(data)
-df.to_csv(f'mAP_vs_topk_images_bit_{input_size}.csv', index = False)
+thresholds = numbers2 + numbers1
 
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh, percentile = True)
+  mAP_results.append(maP)
+print(mAP_results)
 # Plot the line curve
-sns.lineplot(x='topk_number_images', y='mAP', data=df, color = 'r')
-plt.xlabel('Top k number of images')
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
 plt.ylabel('mAP')
 plt.show()
 
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+
+maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True)
+
+print('The mAP is: ',maP)
+
 ```
-:::
+:::{.column-page}
 
-
-
-
-### Model Predictions overview
+### Visualize the Predictions
 
 ::: {.panel-tabset}
 
-####  Test predictions
+####  Test predictions per class
 
 ```{python}
-dic_labels_rev = { 2:'Bent',
-                3:'Compact',
-                  0:'FRI',
-                  1: 'FRII'
-              }
 
-df_training['labels'] = df_training['label_code'].map(dic_labels_rev)
-df_testing['labels'] = df_testing['label_code'].map(dic_labels_rev)
 # Create a figure and axis
 fig, ax = plt.subplots(figsize=(8, 6))
 
 # Iterate over label_code values
 for label_code in range(4):
-    dff = df_testing.query(f'label_code == {label_code}')
+    dff = df_testing.query(f'label_name == {label_code}')
     out_array_train = []
     dd_train = np.array([out_array_train.extend(np.array(out)) for _, out in enumerate(dff.predictions)])
     out_array_train = np.array(out_array_train)
     
     # Plot the KDE curve with a hue
-    sns.kdeplot(out_array_train, label=f'{dic_labels[label_code]}', ax=ax)
+    sns.kdeplot(out_array_train, label=f'Label {label_code}', ax=ax)
 
 # Set the x-axis limits
 ax.set_xlim(-1, 1)
@@ -523,20 +508,9 @@ ax.legend()
 # Display the plot
 plt.show()
 plt.close()
-
-df = pd.DataFrame([df_testing.predictions[0]])
-df.columns = ['hash_'+str(i) for i in range(36)]
-df['label'] = df_testing.labels[0]
-for j in range(1,400,20):
-   df2 = pd.DataFrame([df_testing.predictions[j]])
-   df2.columns = ['hash_'+str(i) for i in range(36)]
-   df2['label'] = df_testing.labels[j]
-   df = pd.concat([df,df2])
-
-display(Markdown(df.to_markdown(index = True)))
 ```
 
-####  Train predictions
+####  Train predictions per class
 
 ```{python}
 
@@ -545,13 +519,13 @@ fig, ax = plt.subplots(figsize=(8, 6))
 
 # Iterate over label_code values
 for label_code in range(4):
-    dff = df_training.query(f'label_code == {label_code}')
+    dff = df_training.query(f'label_name == {label_code}')
     out_array_train = []
     dd_train = np.array([out_array_train.extend(np.array(out)) for _, out in enumerate(dff.predictions)])
     out_array_train = np.array(out_array_train)
     
     # Plot the KDE curve with a hue
-    sns.kdeplot(out_array_train, label=f'{dic_labels[label_code]}', ax=ax)
+    sns.kdeplot(out_array_train, label=f'Label {label_code}', ax=ax)
 
 # Set the x-axis limits
 ax.set_xlim(-1, 1)
@@ -565,21 +539,9 @@ ax.legend()
 # Display the plot
 plt.show()
 plt.close()
-
-
-df = pd.DataFrame([df_training.predictions[0]])
-df.columns = ['hash_'+str(i) for i in range(36)]
-df['label'] = df_training.labels[0]
-for j in range(1,1180,50):
-   df2 = pd.DataFrame([df_training.predictions[j]])
-   df2.columns = ['hash_'+str(i) for i in range(36)]
-   df2['label'] = df_training.labels[j]
-   df = pd.concat([df,df2])
-
-display(Markdown(df.to_markdown(index = True)))
 ```
 
-####  T-SNE projection (Test) 
+####  T-SNE projection of the last layer - Test data 
 
 ```{python}
 # %%
@@ -590,7 +552,9 @@ for i in range(df_testing['predictions'].shape[0]):
 array_dat = np.array(array_dat)
 array_dat.shape
 
-y = df_testing.labels
+from sklearn.manifold import TSNE
+
+y = df_testing.label_code
 tsne = TSNE(n_components=2, random_state=42)
 z = tsne.fit_transform(array_dat)
 df = pd.DataFrame()
@@ -601,41 +565,7 @@ df["comp-2"] = z[:,1]
 sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
                 palette=sns.color_palette("hls", 4),
                 data=df).set(title="Model last layer T-SNE projection")
-
-plt.show()
-plt.close()
-```
-
-
-####  T-SNE projection (Train) 
-
-```{python}
-
 # %%
-array_dat = []
-for i in range(df_training['predictions'].shape[0]):
-  array_dat.append(list(df_training['predictions'].iloc[i]))
-
-array_dat = np.array(array_dat)
-y = df_training.labels
-tsne = TSNE(n_components=2, random_state=42)
-z = tsne.fit_transform(array_dat)
-df = pd.DataFrame()
-df["y"] = y
-df["comp-1"] = z[:,0]
-df["comp-2"] = z[:,1]
-
-sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
-                palette=sns.color_palette("hls", 4),
-                data=df).set(title="Model last layer T-SNE projection")
-
-
-plt.show()
-plt.close()
-```
-
-####  T-SNE projection (Test & Train) 
-```{python}
 array_dat = []
 for i in range(df_training['predictions'].shape[0]):
   array_dat.append(list(df_training['predictions'].iloc[i]))
@@ -645,7 +575,7 @@ for i in range(df_testing['predictions'].shape[0]):
 array_dat = np.array(array_dat)
 
 
-y = np.array(pd.concat([df_training.labels,df_testing.labels]))
+y = np.array(pd.concat([df_training.label_code,df_testing.label_code]))
 tsne = TSNE(n_components=2, random_state=42)
 z = tsne.fit_transform(array_dat)
 df = pd.DataFrame()
@@ -659,25 +589,94 @@ sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
 plt.show()
 plt.close()
 ```
+
+
+####  T-SNE projection of the last layer - Train data 
+
+```{python}
+
+array_dat = []
+for i in range(df_training['predictions'].shape[0]):
+  array_dat.append(list(df_training['predictions'].iloc[i]))
+
+for i in range(df_testing['predictions'].shape[0]):
+  array_dat.append(list(df_testing['predictions'].iloc[i]))
+array_dat = np.array(array_dat)
+
+
+y = np.array(pd.concat([df_training.label_code,df_testing.label_code]))
+tsne = TSNE(n_components=2, random_state=42)
+z = tsne.fit_transform(array_dat)
+df = pd.DataFrame()
+df["y"] = y
+df["comp-1"] = z[:,0]
+df["comp-2"] = z[:,1]
+
+sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
+                palette=sns.color_palette("hls", 4),
+                data=df).set(title="Model last layer T-SNE projection")
+plt.show()
+plt.close()
+```
+
+####  T-SNE projection of the last layer - Test & Train data 
+```{python}
+
+array_dat = []
+for i in range(df_training['predictions'].shape[0]):
+  array_dat.append(list(df_training['predictions'].iloc[i]))
+
+array_dat = np.array(array_dat)
+array_dat.shape
+
+
+y = df_training.label_code
+tsne = TSNE(n_components=2, random_state=42)
+z = tsne.fit_transform(array_dat)
+df = pd.DataFrame()
+df["y"] = y
+df["comp-1"] = z[:,0]
+df["comp-2"] = z[:,1]
+
+sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
+                palette=sns.color_palette("hls", 4),
+                data=df).set(title="Model last layer T-SNE projection - Train & Test data combined")
+plt.show()
+plt.close()
+```
 :::
 
 
 
 ### View the image retrieval - COSFIRE Approach
 ```{python}
+dic_labels = { 2: 'Bent',
+                3: ' Compact',
+                 0: 'FRI',
+                 1: 'FRII'
+              }
 
+df_training['labels'] = df_training['label_code'].map(dic_labels)
+df_testing['labels'] = df_testing['label_code'].map(dic_labels)
 
-def add_data_paths(train_paths = '../data/train/*/*', dic_labels_rev = dic_labels_rev):
-   df_labels_train_paths = pd.DataFrame()
-   df_labels_train_paths['paths'] = glob.glob(train_paths)
-   df_labels_train_paths['label'] = df_labels_train_paths['paths'].apply(lambda x: x.split(os.path.sep)[1] )
-   df_labels_train_paths['label_code'] = df_labels_train_paths['label'].map(dic_labels_rev)
-   df_labels_train_paths = df_labels_train_paths.sort_values('label_code')
-   df_labels_train_paths = df_labels_train_paths.reset_index()[['paths', 'label', 'label_code']]
-   return df_labels_train_paths
+df_labels_paths = pd.DataFrame()
+df_labels_paths['paths'] = glob.glob('../data/test/*/*')
+df_labels_paths['label'] = df_labels_paths['paths'].apply(lambda x: x.split(os.path.sep)[1] )
+dic_labels_rev = { 'Bent':2,
+                'Compact':3,
+                  'FRI':0,
+                  'FRII':1
+              }
+df_labels_paths['label_code'] = df_labels_paths['label'].map(dic_labels_rev)
+df_labels_paths = df_labels_paths.sort_values('label_code')
+df_labels_paths = df_labels_paths.reset_index()[['paths', 'label', 'label_code']]
 
-df_labels_train_paths = add_data_paths(train_paths = '../data/train/*/*', dic_labels_rev = dic_labels_rev)
-df_labels_test_paths = add_data_paths(train_paths = '../data/test/*/*', dic_labels_rev = dic_labels_rev)
+df_labels_train_paths = pd.DataFrame()
+df_labels_train_paths['paths'] = glob.glob('../data/train/*/*')
+df_labels_train_paths['label'] = df_labels_train_paths['paths'].apply(lambda x: x.split(os.path.sep)[1] )
+df_labels_train_paths['label_code'] = df_labels_train_paths['label'].map(dic_labels_rev)
+df_labels_train_paths = df_labels_train_paths.sort_values('label_code')
+df_labels_train_paths = df_labels_train_paths.reset_index()[['paths', 'label', 'label_code']]
 
 def perf_percentages(input_data):
     unique, counts = np.unique(input_data, return_counts=True)
@@ -689,10 +688,10 @@ def perf_percentages(input_data):
 
     
 def query_image(test_image_index = 190, 
-               test_images_paths = df_labels_test_paths,
-               train_images_db_paths = df_labels_train_paths,
-               train_images_db = train_binary,
-               test_binary = test_binary):
+test_images_paths = df_labels_paths,
+train_images_db_paths = df_labels_train_paths,
+train_images_db = train_binary,
+test_binary = test_binary):
 
          
     print('Test Image is: ', test_images_paths.label[test_image_index])
@@ -714,12 +713,12 @@ def query_image(test_image_index = 190,
     paths_to_imgs = [train_images_db_paths.paths[index] for _,index in enumerate(top_indices)]
     df = perf_percentages([train_images_db_paths.label[index] for index in top_indices])
     print(df)
-    cols = 7
+    cols = 8
     rows = 4
 
     fig = plt.figure(figsize=(2 * cols, 2 * rows))
     for col in range(cols):
-        for i, img_path in enumerate(paths_to_imgs[:cols*rows]):
+        for i, img_path in enumerate(paths_to_imgs[:32]):
             ax = fig.add_subplot(rows, cols, i + 1)
             ax.grid(visible=False)
             ax.axis("off")
@@ -729,7 +728,10 @@ def query_image(test_image_index = 190,
             ax.set_title(img_path.split(os.path.sep)[1])
 
     plt.show()
-  
+    
+
+
+#df_testing.labels.value_counts(sort=False)
 ```
 
 
@@ -737,6 +739,14 @@ def query_image(test_image_index = 190,
 
 #### FRI 
 
+```{python}
+
+#0-200
+
+#query_image(test_image_index = 5)
+
+
+```
 
 </br>
 
@@ -748,6 +758,13 @@ query_image(test_image_index = random.randint(0, 100))
 
 #### FRII
 
+```{python}
+
+#101-200
+#query_image(test_image_index =105)
+
+
+```
 
 </br>
 
@@ -758,6 +775,12 @@ query_image(test_image_index = random.randint(101, 202))
 
 #### Bent
 
+```{python}
+
+#200 - 300
+#query_image(test_image_index =250)
+
+```
 </br>
 
 ```{python}
@@ -766,7 +789,12 @@ query_image(test_image_index = random.randint(205, 300))
 ```
 #### Compact
 
+```{python}
 
+#300-400
+#query_image(test_image_index =403)
+
+```
 
 </br>
 
@@ -775,74 +803,12 @@ query_image(test_image_index = random.randint(205, 300))
 query_image(test_image_index = random.randint(310, 400))
 ```
 
-```{python}
-
-```
-
 :::
 
 
 
 </br>
 
-### Further Analyses
-
-Preliminary analyses: Model comparisons while using different bit sizes.
-
-::: {.panel-tabset}
-
-####  mAP vs topk images
-```{python}
-
-output_sizes = [8,16,24,32,36,48,64,72]
-df_mAPs = pd.DataFrame(columns = ['topk_number_images', 'mAP', 'bit_size'])
-for _, output_size in enumerate(output_sizes):
-   df = pd.read_csv(f'mAP_vs_topk_images_{output_size}bit.csv')
-   df['bit_size'] = str(output_size)
-   df_mAPs = pd.concat([df_mAPs, df])
-
-# Plot the line curve
-sns.lineplot(x='topk_number_images', y='mAP', data=df_mAPs, hue='bit_size')
-plt.axhline(y=1, color='w', linestyle='-') # added to make the axis begin from 0 - trick:)
-plt.xlabel('Top k number of images')
-plt.ylabel('mAP')
-plt.show()
-
-```
-
-
-
-#### Bit Size Comparisons
-
-```{python}
-# df_top_mAP = df.sort_values(by="mAP", ascending=False).head(10)
-# display(Markdown(df_top_mAP.to_markdown(index = True)))
-data = {'bit': ['8_bit', '16_bit', '24_bit', '32_bit', '36_bit', '48_bit', '64_bit', '72_bit'],
-        'mAP': [60.68, 60.12, 76.12, 91.76,93.06, 91.97, 91.41,90.77]}
-df = pd.DataFrame(data)
-
-# Create the bar plot
-plt.figure(figsize=(10, 6))
-plt.bar(df['bit'], df['mAP'])
-#plt.ylim(50,100)
-
-# Add value labels to the bars
-for i, v in enumerate(df['mAP']):
-    if df['bit'][i] in ['8_bit', '16_bit', '24_bit']:
-        color = 'red'
-    else:
-        color = 'black'
-    plt.text(i, v + 0.5, str(v), ha='center', color=color)
-
-
-# Set the plot title and labels
-plt.title('mAP Values for Different Bit sizes')
-plt.xlabel('Bit Size')
-plt.ylabel('mAP')
-
-# Display the plot
-plt.show()
-```
 
 :::
 :::
