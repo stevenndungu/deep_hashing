@@ -61,6 +61,7 @@ h4.date { /* Header 4 - and the author and data headers use this too  */
 
 
 ------------------------------------------------------------------------
+
 :::{.column-page}
 
 ::: {style="text-align:center"}
@@ -98,6 +99,7 @@ The dataframe stores these image descriptor vectors, with each row representing 
 
 
 #$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+
 from cosfire_workflow_utils import *
 df_training, df_testing, train_label_code, valid_label_code, _ = get_data(r"G:\My Drive\cosfire\COSFIREdescriptor.mat")
 
@@ -220,6 +222,7 @@ class CosfireNet(nn.Module):
     def forward(self, x):
         return self.hd(x)
     
+# Data
 class CosfireDataset(Dataset):
     def __init__(self, dataframe):
         self.data = torch.tensor(dataframe.iloc[:, :-1].values, dtype=torch.float32)
@@ -236,31 +239,30 @@ input_size = 200
 output_size = 24
 learning_rate = 0.01
 batch_size = 16
-alpha = 0.0001
-epochs = 600
+alpha = 1.00E-05
+epochs = 400
 props = 0.1
 margin = 24
 
-train_df, valid_df = train_test_split(df_training, test_size=props, random_state=42)
+train_df, valid_df = train_test_split(df_training, test_size = props, random_state = 42)
 
-# Create DataLoader for train and test set
 train_dataset = CosfireDataset(train_df)
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size = batch_size, shuffle = True)
+
 valid_dataset = CosfireDataset(valid_df)
-test_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+valid_dataloader = DataLoader(valid_dataset, batch_size = batch_size, shuffle = False)
+
+
 
 # Instantiate CosfireNet
 model = CosfireNet(input_size, output_size)
 
-def DSHLoss(u, y,alpha, margin):
-      # m > 0 is a margin. The margin defines a radius around X1,X2. Dissimilar pairs contribute to the loss
+def DSHLoss(u, y, alpha, margin):
+    #alpha = 1e-5  # m > 0 is a margin. The margin defines a radius around X1,X2. Dissimilar pairs contribute to the loss
     # function only if their distance is within this radius
-    m = 2 * margin  
-    
+    m = 2 * margin  # Initialize U and Y with the current batch's embeddings and labels
     y = y.int()
-
-    # Create a duplicate y_label to form an N X N matrix
-    #y = torch.Tensor(np.tile(np.array([np.array(Y)]).transpose(), (1, len(y))))
+    # Create a duplicate y_label
     y = y.unsqueeze(1).expand(len(y),len(y))
     y_label = torch.ones_like(torch.empty(len(y), len(y)))
     y_label[y == y.t()] = 0
@@ -277,15 +279,10 @@ def DSHLoss(u, y,alpha, margin):
     return minibatch_loss
 
 
-
-################################################################################
-############
 ################################################################################
 
 
-#%%
-################################################################################
-############
+
 ################################################################################
 
 
@@ -333,7 +330,7 @@ for epoch in tqdm(range(epochs), desc='Training Progress', leave=True):
     total_val_loss = 0.0
     
     with torch.no_grad():
-        for val_inputs, val_labels in test_dataloader:
+        for val_inputs, val_labels in valid_dataloader:
          
             val_outputs = model(val_inputs)
             features.append(u)
@@ -341,13 +338,13 @@ for epoch in tqdm(range(epochs), desc='Training Progress', leave=True):
             total_val_loss += val_loss.item()
 
     # Calculate average validation loss
-    average_val_loss = total_val_loss / len(test_dataloader)
+    average_val_loss = total_val_loss / len(valid_dataloader)
     val_losses.append(average_val_loss)
 
     # Save the model if it is the best so far
    #  if average_val_loss < best_val_loss:
    #    best_val_loss = average_val_loss
-   #    model_save_path = 'best_model_mAP_93_06.pth'
+   #    model_save_path = 'best_model.pth'
    #    torch.save(model, model_save_path)
 model_save_path = f'best_model_{output_size}_bit.pth'
 torch.save(model, model_save_path)
@@ -368,27 +365,117 @@ plt.show()
 ###       Evaluate              ###
 ###################################
 
-#model = CosfireNet(input_size, output_size)
-
 # Load the best model
-#best_model_path = 'best_model1.pth'
 model = torch.load(model_save_path)
 model.eval()
 
+
+#################################################################
+valid_dataset = CosfireDataset(valid_df)
+valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+train_dataset = CosfireDataset(train_df)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+        train_outputs = model(train_inputs)
+        predictions.append(train_outputs.numpy())
+
+# Flatten the predictions
+flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+train_df['predictions'] = flat_predictions_train
+
+#################################################################
+
+# Lists to store predictions
+predictions = []
+
+# Perform predictions on the testing set
+with torch.no_grad():
+    for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
+        valid_preds = model(valid_inputs)
+        predictions.append(valid_preds.numpy())
+
+# Flatten the predictions
+flat_predictions_test = [item for sublist in predictions for item in sublist]
+
+# Append predictions to the df_testing DataFrame
+valid_df['predictions'] = flat_predictions_test
+################################################################
+
+
+#thresholds = list(range(50,100,0.5))#[30, 50, 55, 65, 70, 85, 90]#)
+#thresholds = np.linspace(50, 70, 50).tolist()
+# start = 55.714285714
+# end = 100
+# step = 0.408163265306122*10
+
+# numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
+
+# start = 0
+# end = 55.714285714
+# step = 0.408163265306122*10
+
+# numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
+
+
+#thresholds = numbers2 + numbers1
+
+
+thresholds = list(range(0,100,5))#[30, 50, 55, 65, 70, 85, 90]#)
+# thresholds = np.linspace(50, 70, 50).tolist()
+
+mAP_results = []
+for _,thresh in enumerate(thresholds):
+
+  maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True,topk=100)
+  mAP_results.append(maP)
+
+
+
+data = {'mAP': mAP_results,
+        'threshold': thresholds}
+
+df = pd.DataFrame(data)
+
+# Find the index of the maximum mAP value
+max_map_index = df['mAP'].idxmax()
+
+# Retrieve the threshold corresponding to the maximum mAP
+threshold_max_map = df.loc[max_map_index, 'threshold']
+
+maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True, topk=100)
+
+# Plot the line curve
+plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
+plt.xlabel('Threshold (Percentile)')
+plt.ylabel('mAP')
+plt.show()
+
+print('The optimal threshold is: ', threshold_max_map)
+print('The Best Validation mAP is: ',maP)
+```
+
+#### Model Testing
+
+Now applying the same model (best model from the validation data) to the test data with the best threshold as per the validation data.
+
+```{python}
 test_dataset = CosfireDataset(df_testing)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 train_dataset = CosfireDataset(df_training)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
 
-dic_labels = { 2: 'Bent',
-                3: ' Compact',
-                 0: 'FRI',
-                 1: 'FRII'
-              }
 
-df_training['labels'] = df_training['label_name'].map(dic_labels)
-df_testing['labels'] = df_testing['label_name'].map(dic_labels)
 
 # %%
 # Lists to store predictions
@@ -405,7 +492,7 @@ flat_predictions_train = [item for sublist in predictions for item in sublist]
 
 # Append predictions to the df_testing DataFrame
 df_training['predictions'] = flat_predictions_train
-df_training['label_code'] = train_label_code
+
 #################################################################
 
 # Lists to store predictions
@@ -422,79 +509,44 @@ flat_predictions_test = [item for sublist in predictions for item in sublist]
 
 # Append predictions to the df_testing DataFrame
 df_testing['predictions'] = flat_predictions_test
-df_testing['label_code'] = test_label_code
-################################################################
 
 
-#thresholds = list(range(50,100,0.5))#[30, 50, 55, 65, 70, 85, 90]#)
-#thresholds = np.linspace(50, 70, 50).tolist()
-start = 55.714285714
-end = 100
-step = 0.408163265306122*10
+maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
 
-numbers1 = [start + i * step for i in range(int((end - start) / step) + 1)]
-
-start = 0
-end = 55.714285714
-step = 0.408163265306122*10
-
-numbers2 =  [start + i * step for i in range(int((end - start) / step) + 1)]
-
-
-thresholds = numbers2 + numbers1
-
-
-mAP_results = []
-for _,thresh in enumerate(thresholds):
-
-  maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh, percentile = True)
-  mAP_results.append(maP)
-print(mAP_results)
-# Plot the line curve
-plt.plot(thresholds, mAP_results,  linestyle='-',color = 'red')
-plt.xlabel('Threshold (Percentile)')
-plt.ylabel('mAP')
-plt.show()
-
-data = {'mAP': mAP_results,
-        'threshold': thresholds}
-
-df = pd.DataFrame(data)
-
-# Find the index of the maximum mAP value
-max_map_index = df['mAP'].idxmax()
-
-# Retrieve the threshold corresponding to the maximum mAP
-threshold_max_map = df.loc[max_map_index, 'threshold']
-
-
-maP,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True)
-
-print('The mAP is: ',maP)
-
+print('At the optimal threshold: ', threshold_max_map)
+print('The Test mAP is: ',maP)
 ```
+
 :::{.column-page}
 
-### Visualize the Predictions
+
+### Model Predictions overview
 
 ::: {.panel-tabset}
 
-####  Test predictions per class
+####  Test predictions
 
 ```{python}
+dic_labels_rev = { 2:'Bent',
+                3:'Compact',
+                  0:'FRI',
+                  1: 'FRII'
+              }
 
+df_training['labels'] = df_training['label_code'].map(dic_labels_rev)
+df_testing['labels'] = df_testing['label_code'].map(dic_labels_rev)
 # Create a figure and axis
 fig, ax = plt.subplots(figsize=(8, 6))
 
 # Iterate over label_code values
 for label_code in range(4):
-    dff = df_testing.query(f'label_name == {label_code}')
+    dff = df_testing.query(f'label_code == {label_code}')
     out_array_train = []
     dd_train = np.array([out_array_train.extend(np.array(out)) for _, out in enumerate(dff.predictions)])
     out_array_train = np.array(out_array_train)
     
     # Plot the KDE curve with a hue
-    sns.kdeplot(out_array_train, label=f'Label {label_code}', ax=ax)
+    sns.kdeplot(out_array_train, label=f'{dic_labels[label_code]}', ax=ax)
 
 # Set the x-axis limits
 ax.set_xlim(-1, 1)
@@ -508,9 +560,20 @@ ax.legend()
 # Display the plot
 plt.show()
 plt.close()
+
+df = pd.DataFrame([df_testing.predictions[0]])
+df.columns = ['hash_'+str(i) for i in range(36)]
+df['label'] = df_testing.labels[0]
+for j in range(1,400,20):
+   df2 = pd.DataFrame([df_testing.predictions[j]])
+   df2.columns = ['hash_'+str(i) for i in range(36)]
+   df2['label'] = df_testing.labels[j]
+   df = pd.concat([df,df2])
+
+display(Markdown(df.to_markdown(index = True)))
 ```
 
-####  Train predictions per class
+####  Train predictions
 
 ```{python}
 
@@ -519,13 +582,13 @@ fig, ax = plt.subplots(figsize=(8, 6))
 
 # Iterate over label_code values
 for label_code in range(4):
-    dff = df_training.query(f'label_name == {label_code}')
+    dff = df_training.query(f'label_code == {label_code}')
     out_array_train = []
     dd_train = np.array([out_array_train.extend(np.array(out)) for _, out in enumerate(dff.predictions)])
     out_array_train = np.array(out_array_train)
     
     # Plot the KDE curve with a hue
-    sns.kdeplot(out_array_train, label=f'Label {label_code}', ax=ax)
+    sns.kdeplot(out_array_train, label=f'{dic_labels[label_code]}', ax=ax)
 
 # Set the x-axis limits
 ax.set_xlim(-1, 1)
@@ -539,9 +602,21 @@ ax.legend()
 # Display the plot
 plt.show()
 plt.close()
+
+
+df = pd.DataFrame([df_training.predictions[0]])
+df.columns = ['hash_'+str(i) for i in range(36)]
+df['label'] = df_training.labels[0]
+for j in range(1,1180,50):
+   df2 = pd.DataFrame([df_training.predictions[j]])
+   df2.columns = ['hash_'+str(i) for i in range(36)]
+   df2['label'] = df_training.labels[j]
+   df = pd.concat([df,df2])
+
+display(Markdown(df.to_markdown(index = True)))
 ```
 
-####  T-SNE projection of the last layer - Test data 
+####  T-SNE projection (Test) 
 
 ```{python}
 # %%
@@ -552,9 +627,7 @@ for i in range(df_testing['predictions'].shape[0]):
 array_dat = np.array(array_dat)
 array_dat.shape
 
-from sklearn.manifold import TSNE
-
-y = df_testing.label_code
+y = df_testing.labels
 tsne = TSNE(n_components=2, random_state=42)
 z = tsne.fit_transform(array_dat)
 df = pd.DataFrame()
@@ -565,17 +638,23 @@ df["comp-2"] = z[:,1]
 sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
                 palette=sns.color_palette("hls", 4),
                 data=df).set(title="Model last layer T-SNE projection")
+
+plt.show()
+plt.close()
+```
+
+
+####  T-SNE projection (Train) 
+
+```{python}
+
 # %%
 array_dat = []
 for i in range(df_training['predictions'].shape[0]):
   array_dat.append(list(df_training['predictions'].iloc[i]))
 
-for i in range(df_testing['predictions'].shape[0]):
-  array_dat.append(list(df_testing['predictions'].iloc[i]))
 array_dat = np.array(array_dat)
-
-
-y = np.array(pd.concat([df_training.label_code,df_testing.label_code]))
+y = df_training.labels
 tsne = TSNE(n_components=2, random_state=42)
 z = tsne.fit_transform(array_dat)
 df = pd.DataFrame()
@@ -586,15 +665,14 @@ df["comp-2"] = z[:,1]
 sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
                 palette=sns.color_palette("hls", 4),
                 data=df).set(title="Model last layer T-SNE projection")
+
+
 plt.show()
 plt.close()
 ```
 
-
-####  T-SNE projection of the last layer - Train data 
-
+####  T-SNE projection (Test & Train) 
 ```{python}
-
 array_dat = []
 for i in range(df_training['predictions'].shape[0]):
   array_dat.append(list(df_training['predictions'].iloc[i]))
@@ -604,7 +682,7 @@ for i in range(df_testing['predictions'].shape[0]):
 array_dat = np.array(array_dat)
 
 
-y = np.array(pd.concat([df_training.label_code,df_testing.label_code]))
+y = np.array(pd.concat([df_training.labels,df_testing.labels]))
 tsne = TSNE(n_components=2, random_state=42)
 z = tsne.fit_transform(array_dat)
 df = pd.DataFrame()
@@ -615,36 +693,11 @@ df["comp-2"] = z[:,1]
 sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
                 palette=sns.color_palette("hls", 4),
                 data=df).set(title="Model last layer T-SNE projection")
-plt.show()
-plt.close()
-```
-
-####  T-SNE projection of the last layer - Test & Train data 
-```{python}
-
-array_dat = []
-for i in range(df_training['predictions'].shape[0]):
-  array_dat.append(list(df_training['predictions'].iloc[i]))
-
-array_dat = np.array(array_dat)
-array_dat.shape
-
-
-y = df_training.label_code
-tsne = TSNE(n_components=2, random_state=42)
-z = tsne.fit_transform(array_dat)
-df = pd.DataFrame()
-df["y"] = y
-df["comp-1"] = z[:,0]
-df["comp-2"] = z[:,1]
-
-sns.scatterplot(x="comp-1", y="comp-2", hue=df.y.tolist(),
-                palette=sns.color_palette("hls", 4),
-                data=df).set(title="Model last layer T-SNE projection - Train & Test data combined")
 plt.show()
 plt.close()
 ```
 :::
+
 
 
 
