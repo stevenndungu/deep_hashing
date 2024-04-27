@@ -318,13 +318,13 @@ model = torch.load(model_save_path)
 model.eval()
 
 
-train_df, valid_df = train_test_split(df_training, test_size=0.1, random_state=42)
+train_df, valid_df = train_test_split(df_training, test_size = props, random_state = 42)
 
 valid_dataset = CosfireDataset(valid_df)
-valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+valid_dataloader = DataLoader(valid_dataset, batch_size = batch_size, shuffle = False)
 
 train_dataset = CosfireDataset(train_df)
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size = batch_size, shuffle = False)
 
 
 # %%
@@ -342,7 +342,7 @@ flat_predictions_train = [item for sublist in predictions for item in sublist]
 
 # Append predictions to the df_testing DataFrame
 train_df['predictions'] = flat_predictions_train
-#train_df['label_code'] = train_label_code
+
 #################################################################
 
 # Lists to store predictions
