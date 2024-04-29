@@ -425,7 +425,7 @@ def query_image(test_image_index = 0,
 </br>
 
 ```{python}
-query_image(test_image_index = random.randint(0, 100))
+#query_image(test_image_index = random.randint(0, 100))
 ```
 
 #### FRII
@@ -435,7 +435,7 @@ query_image(test_image_index = random.randint(0, 100))
 
 ```{python}
 
-query_image(test_image_index = random.randint(101, 202))
+#query_image(test_image_index = random.randint(101, 202))
 ```
 
 #### Bent
@@ -444,7 +444,7 @@ query_image(test_image_index = random.randint(101, 202))
 
 ```{python}
 
-query_image(test_image_index = random.randint(205, 300))
+#query_image(test_image_index = random.randint(205, 300))
 ```
 #### Compact
 
@@ -454,7 +454,7 @@ query_image(test_image_index = random.randint(205, 300))
 
 ```{python}
 
-query_image(test_image_index = random.randint(310, 400))
+#query_image(test_image_index = random.randint(310, 400))
 ```
 
 
