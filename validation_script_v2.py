@@ -5,6 +5,8 @@ from cosfire_workflow_utils import *
 # Hyperparameters
 parser = argparse.ArgumentParser(description='COSFIRENet Training and Evaluation')
 parser.add_argument('--data_path', type=str, default= "COSFIREdescriptor.mat", help='Path to the COSFIREdescriptor.mat file')
+parser.add_argument('--data_path_valid', type=str, default= "COSFIREdescriptor_train_valid.mat", help='Path to the COSFIREdescriptor_train_valid.mat file')
+
 parser.add_argument('--input_size', type=int, default=200, help='Input size of the Descriptors')
 parser.add_argument('--output_size', type=int, default=36, help='Output size of the COSFIRENet')
 parser.add_argument('--learning_rate', type=float, default=0.01, help='Learning rate')
@@ -22,6 +24,7 @@ learning_rate = args.learning_rate
 batch_size = args.batch_size
 epochs = args.epochs
 data_path = args.data_path
+data_path_valid = args.data_path_valid
 alpha = args.alpha
 props = args.props
 margin = args.margin
@@ -102,12 +105,14 @@ def run():
                     for props in props_values:
                         for batch_size in batch_size_values:
                             path = args.data_path
-                            df_training, df_testing, train_label_code, valid_label_code, _ = get_data(path)
+                            path_valid = args.data_path_valid
+                            train_df, df_testing, _, _, _ = get_data(path)
+                            _, valid_df, _, _, _ = get_data(path_valid)
                             
-                            train_df, valid_df = train_test_split(df_training, test_size=props, random_state=42)
+                            
+                            
                             train_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
                             valid_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
-                            df_training.rename(columns = {'label_name': 'label_code'}, inplace = True)
                             df_testing.rename(columns = {'label_name': 'label_code'}, inplace = True)
 
                             # Create DataLoader for training set
@@ -184,13 +189,10 @@ def run():
                             valid_dataset = CosfireDataset(valid_df)
                             valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
 
-                            train_dataset = CosfireDataset(train_df)
-                            train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-
                             test_dataset = CosfireDataset(df_testing)
                             test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-                            train_dataset_full = CosfireDataset(df_training)
+                            train_dataset_full = CosfireDataset(train_df)
                             train_dataloader_full = DataLoader(train_dataset_full, batch_size=batch_size, shuffle=False)
 
                             # Lists to store predictions
@@ -198,7 +200,7 @@ def run():
 
                             # Perform predictions on the train set
                             with torch.no_grad():
-                                for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
+                                for train_inputs, _ in tqdm(train_dataloader_full, desc='Predicting', leave=True):
                                     train_outputs = model(train_inputs)
                                     predictions.append(train_outputs.numpy())
 
@@ -277,12 +279,12 @@ def run():
                             # Flatten the predictions
                             flat_predictions_train_full = [item for sublist in predictions_train_full for item in sublist]
 
-                            # Append predictions to the df_testing DataFrame
-                            df_training['predictions'] = flat_predictions_train_full
+                            # Append predictions to the df_train DataFrame
+                            train_df['predictions'] = flat_predictions_train_full
                             
                             
 
-                            mAP_test,_, _, _, _ = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True)
+                            mAP_test,_, _, _, _ = mAP_values(train_df,df_testing,thresh = threshold_max_map, percentile = True)
 
                         
 
@@ -303,14 +305,14 @@ def run():
                                 
                             }
                             results_df = pd.DataFrame([results])
-                            if not os.path.isfile("model_selection_validation.csv"):
+                            if not os.path.isfile("model_selection_valid_and_test.csv"):
                                 
                                 df = pd.DataFrame(columns=['input_size', 'output_size', 'learning_rate', 'batch_size', 'epochs','threshold_max_map', 'mAP', 'alpha', 'model_type', 'props', 'margin'])
-                                df.to_csv("model_selection_validation.csv", index=False)
+                                df.to_csv("model_selection_valid_and_test.csv", index=False)
                             else:
                                 df = pd.read_csv("model_selection_validation.csv")
                                 results_df = pd.concat([df, results_df], ignore_index=True)
-                                results_df.to_csv('model_selection_validation.csv', index=False)
+                                results_df.to_csv('model_selection_valid_and_test.csv', index=False)
 
 
 if __name__ == '__main__' :
