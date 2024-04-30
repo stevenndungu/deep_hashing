@@ -1,5 +1,6 @@
 #%%
 from cosfire_workflow_utils import *
+from early_stopping_pytorch import *
 
 
 # Hyperparameters
@@ -131,6 +132,9 @@ def run():
                     # best_val_loss = float('inf')
                     # best_model_path = 'best_model.pth'
 
+                     # initialize the early_stopping object
+                    early_stopping = EarlyStopping(patience=patience, verbose=True)
+
                     # Training loop
                     for _ in tqdm(range(epochs), desc='Training Progress', leave=True):
                         model.train()
@@ -162,10 +166,18 @@ def run():
                         average_val_loss = total_val_loss / len(val_dataloader)
                         val_losses.append(average_val_loss)
 
+                        # early_stopping needs the validation loss to check if it has decresed, 
+                        # and if it has, it will make a checkpoint of the current model
+                        early_stopping(average_val_loss, model)
+                    
+                        if early_stopping.early_stop:
+                            print("Early stopping")
+                            break
+
                         # Save the model if it is the best so far
-                    #  if average_val_loss < best_val_loss:
-                    #      best_val_loss = average_val_loss
-                    #      torch.save(model.state_dict(), best_model_path)
+                        #  if average_val_loss < best_val_loss:
+                        #      best_val_loss = average_val_loss
+                        #      torch.save(model.state_dict(), best_model_path)
 
 
 
@@ -178,6 +190,8 @@ def run():
                     # Load the best model
                     # best_model_path = 'best_model.pth'
                     # model.load_state_dict(torch.load(best_model_path))
+                    # load the last checkpoint with the best model
+                    model.load_state_dict(torch.load('checkpoint.pt'))
                     model.eval()
 
                     valid_dataset = CosfireDataset(valid_df)
