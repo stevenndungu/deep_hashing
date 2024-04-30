@@ -125,7 +125,7 @@ df_training_new = pd.concat([df_training,df_testing], ignore_index=True)
 df_training.drop('label_name', axis=1, inplace=True)
 df_testing.drop('label_name', axis=1, inplace=True)
 
-
+data_preview
 
 display(Markdown(data_preview.to_markdown(index = True)))
 
