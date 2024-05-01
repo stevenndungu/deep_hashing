@@ -12,6 +12,11 @@ from timeit import time
 from pathlib import Path
 import os, sys, random, ast, json, glob, torch
 
+from pathlib import Path
+from functools import partial
+
+import torch
+import torch.nn as nn
 from fastai import *
 from fastai.data.all import *
 from fastai.data.transforms import get_image_files
@@ -28,8 +33,3 @@ from sklearn.metrics import average_precision_score
 from sklearn.preprocessing import label_binarize
 
 
-from pytorch_metric_learning.distances import CosineSimilarity
-from pytorch_metric_learning.reducers import ThresholdReducer
-from pytorch_metric_learning.regularizers import LpRegularizer
-from pytorch_metric_learning import losses,  reducers
-from pytorch_metric_learning.distances import lp_distance
