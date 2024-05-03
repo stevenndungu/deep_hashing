@@ -8,16 +8,16 @@ from python_modules import *
 from cosfire_workflow_utils import *
 
 #%%
-hyper_params = {"num_epochs": 200, "lr": 1e-3, 
+hyper_params = {"num_epochs": 1, "lr": 1e-3, 
                  'bits': 36,
                 'dataset':'data'}
 
 
-dic_labels = {'Bent': 0,
-                'Compact': 1, 
-                'FRI': 2,
-                'FRII': 3 
-              }
+dic_labels = { 'Bent':2,
+  'Compact':3,
+    'FRI':0,
+    'FRII':1
+}
 
 dic_labels_rev = { 2:'Bent',
                 3:'Compact',
@@ -59,9 +59,16 @@ bs = 32
 #also for valid ===> dls.valid.items, and check the size (len(dls.valid.items))
 # NOT for test since it is not imported.
 # Therefore the train contains all the 1180 images and valid 398 images
+# dls = DataBlock(blocks = (ImageBlock,CategoryBlock),
+#                 get_items = get_image_files,
+#                 splitter = GrandparentSplitter(),
+#                 item_tfms=Resize(224),
+#                 get_y = parent_label)
+
+#Here we split the train to train and valid data by hold out.
 dls = DataBlock(blocks = (ImageBlock,CategoryBlock),
                 get_items = get_image_files,
-                splitter = GrandparentSplitter(),
+                splitter = RandomSplitter(valid_pct=0.2, seed=42),
                 item_tfms=Resize(224),
                 get_y = parent_label)
 
@@ -180,13 +187,13 @@ def binarize_data(file_path,dic_labels):
 
 #Save/load the the binaries 
 
-if os.path.exists(output_dir +'/df_testing.csv') and os.path.exists(output_dir +'/df_training.csv') and os.path.exists(output_dir +'/df_valid.csv'):
+if os.path.exists(output_dir +'/df_testing.csv') and os.path.exists(output_dir +'/df_training.csv'):
     
     df_training = pd.read_csv(output_dir +'/df_training.csv')
     df_training['predictions'] = [ast.literal_eval(pred) for pred in df_training.predictions]
 
-    df_valid = pd.read_csv(output_dir +'/df_valid.csv')
-    df_valid['predictions'] = [ast.literal_eval(pred) for pred in df_valid.predictions]
+    # df_valid = pd.read_csv(output_dir +'/df_valid.csv')
+    # df_valid['predictions'] = [ast.literal_eval(pred) for pred in df_valid.predictions]
 
     df_testing = pd.read_csv(output_dir +'/df_testing.csv')
     df_testing['predictions'] = [ast.literal_eval(pred) for pred in df_testing.predictions]
@@ -197,9 +204,9 @@ else:
                                                     dic_labels = dic_labels
                                                     )
 
-    preds_valid, valid_label = binarize_data(file_path = 'data/valid/',
-                                                dic_labels = dic_labels
-                                                    )
+    # preds_valid, valid_label = binarize_data(file_path = 'data/valid/',
+    #                                             dic_labels = dic_labels
+    #                                                 )
     preds_test, test_label = binarize_data(file_path = 'data/test/',
                                                 dic_labels = dic_labels
                                                     )
@@ -276,10 +283,6 @@ maP_valid,train_binary, train_label, valid_binary, valid_label = mAP_values(df_t
 
 maP_test,train_binary, train_label, test_binary, test_label = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True, topk=100)
 
-# Generate random single values for the variables
-threshold_max_map = 60
-maP_valid = 80
-maP_test = 90
 
 # Create a dictionary with the variable names and their values
 data = {'optimal threshold': [threshold_max_map],
