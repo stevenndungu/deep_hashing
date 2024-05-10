@@ -1,10 +1,13 @@
 #%%
 from cosfire_workflow_utils import *
-from early_stopping_pytorch import *
+#from early_stopping_pytorch import *
 
-output_dir = './model_selection_model_v5' 
+output_dir = './model_selection_model_v5/' 
 os.mkdir(output_dir)
 
+
+df = pd.DataFrame(columns=['input_size', 'output_size', 'learning_rate', 'batch_size', 'epochs','threshold_max_map', 'mAP_valid', "mAP_test",'alpha', 'model_type', 'margin'])
+df.to_csv(output_dir + "model_selection_valid_and_test_10052024.csv", index=False)
 
 # Hyperparameters
 parser = argparse.ArgumentParser(description='COSFIRENet Training and Evaluation')
@@ -105,7 +108,7 @@ def run():
                 for batch_size in batch_size_values:
                     path = args.data_path
                     path_valid = args.data_path_valid
-                    train_df, test_df = get_data(path) #data_path: COSFIREdescriptor_best_train_test.mat
+                    train_df, test_df = get_data(path) #data_path: COSFIREdescriptor_best_train_test_file.mat
 
                     _, valid_df = get_data(path_valid) # data_path_valid:COSFIREdescriptor_best_train_valid.mat
                     
@@ -312,19 +315,14 @@ def run():
                         "margin": margin                    
                         
                     }
-                    
-                    results_df = pd.DataFrame([results])
-                    if not os.path.isfile(f"{output_dir}model_selection_valid_and_test_10052024.csv"):
-                        
-                        df = pd.DataFrame(columns=['input_size', 'output_size', 'learning_rate', 'batch_size', 'epochs','threshold_max_map', 'mAP_valid', "mAP_test",'alpha', 'model_type', 'margin'])
-                        results_df = pd.concat([df, results_df], ignore_index=True)
-                        results_df.to_csv(f"{output_dir}model_selection_valid_and_test_10052024.csv", index=False)
-                    else:
-                        df = pd.read_csv(f"{output_dir}model_selection_valid_and_test_10052024.csv")
-                    
-                        results_df = pd.concat([df, results_df], ignore_index=True)
 
-                        results_df.to_csv(f"{output_dir}model_selection_valid_and_test_10052024.csv", index=False)
+                    results_df = pd.DataFrame([results])
+
+                    df = pd.read_csv(output_dir + "model_selection_valid_and_test_10052024.csv")
+                    
+                    results_df = pd.concat([df, results_df], ignore_index=True)
+
+                    results_df.to_csv(output_dir + "model_selection_valid_and_test_10052024.csv", index=False)
                         
 if __name__ == '__main__' :
     run()
