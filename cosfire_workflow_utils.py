@@ -35,6 +35,7 @@ import torch
 from torch.linalg import vector_norm
 
 from sklearn.manifold import TSNE
+from sklearn import preprocessing
 
 #For Reproducibility
 def reproducibility_requirements(seed=42):
