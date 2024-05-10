@@ -2,7 +2,7 @@
 from cosfire_workflow_utils import *
 #from early_stopping_pytorch import *
 
-output_dir = './model_selection_model_v5/' 
+output_dir = './model_selection_model_v6_v2/' 
 os.mkdir(output_dir)
 
 
@@ -42,7 +42,9 @@ class CosfireNet(nn.Module):
     def __init__(self, input_size, output_size):
         super(CosfireNet, self).__init__()
         self.hd = nn.Sequential(
-            nn.Linear(input_size, 128),
+            nn.Linear(input_size, 256),
+            nn.BatchNorm1d(256),
+            nn.Linear(256, 128),
             nn.BatchNorm1d(128),
             nn.Linear(128, 64),
             nn.BatchNorm1d(64),
@@ -108,9 +110,10 @@ def run():
                 for batch_size in batch_size_values:
                     path = args.data_path
                     path_valid = args.data_path_valid
-                    train_df, test_df = get_data(path) #data_path: COSFIREdescriptor_best_train_test_file.mat
+                    
 
-                    _, valid_df = get_data(path_valid) # data_path_valid:COSFIREdescriptor_best_train_valid.mat
+                    train_df, valid_df = get_data(path_valid) # data_path_valid:COSFIREdescriptor_best_train_valid.mat
+                    _, test_df = get_data(path) #data_path: COSFIREdescriptor_best_train_test_file.mat
                     
                     
                     
@@ -311,7 +314,7 @@ def run():
                         'mAP_valid': maP_valid,
                         'mAP_test': mAP_test,
                         'alpha': alpha,
-                        'model_type' : 'model_v5',
+                        'model_type' : 'model_v6',
                         "margin": margin                    
                         
                     }
