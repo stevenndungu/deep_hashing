@@ -4,8 +4,9 @@ Created on Thu Mar 23 10:25:28 2023
 
 @author: P307791
 """
+#%%
 import glob
-import os, random
+import os, random, string
 import torch
 import torch.nn as nn
 import argparse
@@ -17,7 +18,6 @@ import seaborn as sns
 os.environ['PYTHONHASHSEED'] = 'python'
 
 from sklearn.preprocessing import label_binarize
-from IPython.display import Markdown, display
 
 from torch.linalg import vector_norm
 import torch
@@ -33,9 +33,9 @@ from PIL import Image
 
 import torch
 from torch.linalg import vector_norm
-
 from sklearn.manifold import TSNE
 from sklearn import preprocessing
+
 
 #For Reproducibility
 def reproducibility_requirements(seed=42):
@@ -50,6 +50,12 @@ def reproducibility_requirements(seed=42):
     #print("Set seed of", str(seed),"is done for Reproducibility")
 
 reproducibility_requirements()
+
+
+def generate_unique_identifier(length):
+    characters = string.ascii_letters + string.digits
+    identifier = ''.join(random.choice(characters) for _ in range(length))
+    return identifier
 
 
 def SimplifiedTopMap(rB, qB, retrievalL, queryL, topk):
@@ -125,7 +131,7 @@ def get_data(path):
    df2['label'] = 'Bent'
    df3 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][3])
    df3['label'] = 'Compact'
-   df_training = pd.concat([df0, df1, df2, df3], ignore_index=True)
+   df_train = pd.concat([df0, df1, df2, df3], ignore_index=True)
 
    df0 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][0])
    df0['label'] = 'FRI'
@@ -135,34 +141,30 @@ def get_data(path):
    df2['label'] = 'Bent'
    df3 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][3])
    df3['label'] = 'Compact'
-   df_testing = pd.concat([df0, df1, df2, df3], ignore_index=True)
+   df_test = pd.concat([df0, df1, df2, df3], ignore_index=True)
+  
   
    # Rename the columns:
-   column_names = ["descrip_" + str(i) for i in range(1, 201)] + ["label_code"]
-   df_training.columns = column_names
-   df_testing.columns = column_names
+   column_names = ["descrip_" + str(i) for i in range(1, 401)] + ["label_code"]
+   df_train.columns = column_names
+   df_test.columns = column_names
 
    dic_labels = { 'Bent':2,
                   'Compact':3,
                      'FRI':0,
                      'FRII':1
                }
-   df_training['label_name'] = df_training['label_code'].map(dic_labels)
-   df_testing['label_name'] = df_testing['label_code'].map(dic_labels)
+
+  
+   df_train['label_code'] = df_train['label_code'].map(dic_labels)
+   df_test['label_code'] = df_test['label_code'].map(dic_labels)
 
 
-   df_training_new = pd.concat([df_training,df_testing], ignore_index=True)
-
-   train_label_code = df_training['label_name']
-   valid_label_code = df_testing['label_name']
-
-   df_training.drop('label_code', axis=1, inplace=True)
-   df_testing.drop('label_code', axis=1, inplace=True)
-
-   return df_training, df_testing, train_label_code, valid_label_code, df_training_new
+   return df_train, df_test
 
 
 
     
 
     
+# %%
