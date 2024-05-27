@@ -4,7 +4,6 @@ Created on Thu Mar 23 10:25:28 2023
 
 @author: P307791
 """
-#%%
 import glob
 import os, random, string
 import torch
@@ -38,7 +37,7 @@ from sklearn import preprocessing
 
 
 #For Reproducibility
-def reproducibility_requirements(seed=42):
+def reproducibility_requirements(seed=100):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
@@ -149,6 +148,11 @@ def get_data(path):
    df_train.columns = column_names
    df_test.columns = column_names
 
+   #select the optimal number of columns from the classification paper.#Get the optimal 372 descriptors only
+   column_list = [f'descrip_{i}' for i in range(1, 373)] + ['label_code']
+   df_train = df_train[column_list]
+   df_test = df_test[column_list]
+
    dic_labels = { 'Bent':2,
                   'Compact':3,
                      'FRI':0,
@@ -167,4 +171,3 @@ def get_data(path):
     
 
     
-# %%
