@@ -401,7 +401,6 @@ def SimplifiedTopMap(rB, qB, retrievalL, queryL, topk):
     retrievalL - labels of the training set - reference set, 
     queryL - labels of the query set, and 
     topk - the number of top retrieved results to consider.
-
     rB = r_binary
     qB = q_binary
     retrievalL = train_label

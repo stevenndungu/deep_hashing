@@ -133,7 +133,7 @@ loss_function = losses.TripletMarginLoss(margin=0.2,
 
 
 #Data loading
-path = Path('../data-balanced')
+path = Path('data-balanced')
 bs = 32
 
 dls = DataBlock(blocks = (ImageBlock,CategoryBlock),
@@ -168,10 +168,10 @@ dic_labels_rev = { 2:'Bent',
                   1: 'FRII'
               }
 
-result_folder = '../' + model_name
+result_folder =  model_name
 
 
-def add_data_paths(train_paths = '../data-balanced/train/*/*', dic_labels = dic_labels):
+def add_data_paths(train_paths = 'data-balanced/train/*/*', dic_labels = dic_labels):
    df_labels_train_paths = pd.DataFrame()
    df_labels_train_paths['paths'] = glob.glob(train_paths)
    df_labels_train_paths['label'] = df_labels_train_paths['paths'].apply(lambda x: x.split(os.path.sep)[1] )
@@ -214,16 +214,16 @@ if os.path.exists(result_folder +'/df_testing.csv') and os.path.exists(result_fo
 
 else:
     thresh = 60  #just a threshold not optimal
-    preds_train, train_binary, train_label = binarize_data(file_path = '../data-balanced/train/',
+    preds_train, train_binary, train_label = binarize_data(file_path = 'data-balanced/train/',
                                                     dic_labels = dic_labels,
                                                     thresh = thresh
                                                     )
 
-    preds_valid,valid_binary, valid_label = binarize_data(file_path = '../data-balanced/valid/',
+    preds_valid,valid_binary, valid_label = binarize_data(file_path = 'data-balanced/valid/',
                                                 dic_labels = dic_labels,
                                                     thresh = thresh
                                                     )
-    preds_test,test_binary, test_label = binarize_data(file_path = '../data-balanced/test/',
+    preds_test,test_binary, test_label = binarize_data(file_path = 'data-balanced/test/',
                                                 dic_labels = dic_labels,
                                                     thresh = thresh
                                                     )
@@ -316,7 +316,7 @@ print('The Test  mAP is: ',maP_test)
 
 ```{python}
 #What is on the paper
-data = [json.loads(line) for line in open("../data_generated_IMR_DNT161_model_data-balanced_Tue_Feb__7_09_10_59_2023.json",'r')]
+data = [json.loads(line) for line in open(r"I:\My Drive\deep_learning\deep_hashing\data_generated_IMR_DNT161_model_data-balanced_Tue_Feb__7_09_10_59_2023.json",'r')]
 
 thresh_value_paper = []
 maP_paper = []
@@ -351,7 +351,7 @@ plt.show()
 ```{python}
 
 
-def add_data_paths(train_paths = '../data-balanced/train/*/*', dic_labels = dic_labels):
+def add_data_paths(train_paths = 'data-balanced/train/*/*', dic_labels = dic_labels):
    df_labels_train_paths = pd.DataFrame()
    df_labels_train_paths['paths'] = glob.glob(train_paths)
    df_labels_train_paths['label'] = df_labels_train_paths['paths'].apply(lambda x: x.split(os.path.sep)[1] )
@@ -360,8 +360,8 @@ def add_data_paths(train_paths = '../data-balanced/train/*/*', dic_labels = dic_
    df_labels_train_paths = df_labels_train_paths.reset_index()[['paths', 'label', 'label_code']]
    return df_labels_train_paths
 
-df_labels_train_paths = add_data_paths(train_paths = '../data-balanced/train/*/*', dic_labels = dic_labels)
-df_labels_test_paths = add_data_paths(train_paths = '../data-balanced/test/*/*', dic_labels = dic_labels)
+df_labels_train_paths = add_data_paths(train_paths = 'data-balanced/train/*/*', dic_labels = dic_labels)
+df_labels_test_paths = add_data_paths(train_paths = 'data-balanced/test/*/*', dic_labels = dic_labels)
 
 def perf_percentages(input_data):
     unique, counts = np.unique(input_data, return_counts=True)
