@@ -5,7 +5,7 @@ Created on Thu Mar 23 10:25:28 2023
 @author: P307791
 """
 import glob
-import os, random
+import os, random, string
 import torch
 import torch.nn as nn
 import argparse
@@ -17,7 +17,6 @@ import seaborn as sns
 os.environ['PYTHONHASHSEED'] = 'python'
 
 from sklearn.preprocessing import label_binarize
-from IPython.display import Markdown, display
 
 from torch.linalg import vector_norm
 import torch
@@ -33,11 +32,66 @@ from PIL import Image
 
 import torch
 from torch.linalg import vector_norm
-
 from sklearn.manifold import TSNE
+from sklearn import preprocessing
+
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 23 10:25:28 2023
+
+@author: P307791
+"""
+import glob
+import os, random, string
+
+import torch #torch==1.13.1
+import torch.nn as nn
+from torch.linalg import vector_norm
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+#pytorch-metric-learning==2.1.0
+# scikit-image==0.20.0
+# scikit-learn==1.2.2
+#seaborn==0.12.2
+#tqdm==4.65.0
+import argparse
+import pandas as pd #pandas==2.0.0
+from scipy.io import loadmat #scipy==1.10.1
+import matplotlib.pyplot as plt
+import numpy as np #numpy==1.26.4
+import seaborn as sns
+os.environ['PYTHONHASHSEED'] = 'python'
+import re
+from sklearn.preprocessing import label_binarize
+
+
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+
+import random
+
+import torch
+from torch.linalg import vector_norm
+from sklearn.manifold import TSNE
+from sklearn import preprocessing
+
+dic_labels = { 'Bent':2,
+  'Compact':3,
+    'FRI':0,
+    'FRII':1
+}
+
+dic_labels_rev = { 2:'Bent',
+                3:'Compact',
+                  0:'FRI',
+                  1: 'FRII'
+              }
 
 #For Reproducibility
-def reproducibility_requirements(seed=42):
+def reproducibility_requirements(seed=100):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
@@ -49,6 +103,12 @@ def reproducibility_requirements(seed=42):
     #print("Set seed of", str(seed),"is done for Reproducibility")
 
 reproducibility_requirements()
+
+
+def generate_unique_identifier(length):
+    characters = string.ascii_letters + string.digits
+    identifier = ''.join(random.choice(characters) for _ in range(length))
+    return identifier
 
 
 def SimplifiedTopMap(rB, qB, retrievalL, queryL, topk):
@@ -112,7 +172,7 @@ def mAP_values(r_database,q_database, thresh = 0.5, percentile = True, topk = 10
     return np.round(mAP,4), r_binary, train_label, q_binary, valid_label
 
 
-def get_data(path):
+def get_data(path, dic_labels):
        
    # Load the MATLAB file
    data = loadmat(path)
@@ -124,7 +184,7 @@ def get_data(path):
    df2['label'] = 'Bent'
    df3 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][3])
    df3['label'] = 'Compact'
-   df_training = pd.concat([df0, df1, df2, df3], ignore_index=True)
+   df_train = pd.concat([df0, df1, df2, df3], ignore_index=True)
 
    df0 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][0])
    df0['label'] = 'FRI'
@@ -134,34 +194,138 @@ def get_data(path):
    df2['label'] = 'Bent'
    df3 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][3])
    df3['label'] = 'Compact'
-   df_testing = pd.concat([df0, df1, df2, df3], ignore_index=True)
+   df_test = pd.concat([df0, df1, df2, df3], ignore_index=True)
+  
   
    # Rename the columns:
-   column_names = ["descrip_" + str(i) for i in range(1, 201)] + ["label_code"]
-   df_training.columns = column_names
-   df_testing.columns = column_names
+   column_names = ["descrip_" + str(i) for i in range(1, 401)] + ["label_code"]
+   df_train.columns = column_names
+   df_test.columns = column_names
 
-   dic_labels = { 'Bent':2,
-                  'Compact':3,
-                     'FRI':0,
-                     'FRII':1
-               }
-   df_training['label_name'] = df_training['label_code'].map(dic_labels)
-   df_testing['label_name'] = df_testing['label_code'].map(dic_labels)
+   #select the optimal number of columns from the classification paper.#Get the optimal 372 descriptors only
+   column_list = [f'descrip_{i}' for i in range(1, 373)] + ['label_code']
+   df_train = df_train[column_list]
+   df_test = df_test[column_list]
 
-
-   df_training_new = pd.concat([df_training,df_testing], ignore_index=True)
-
-   train_label_code = df_training['label_name']
-   valid_label_code = df_testing['label_name']
-
-   df_training.drop('label_code', axis=1, inplace=True)
-   df_testing.drop('label_code', axis=1, inplace=True)
-
-   return df_training, df_testing, train_label_code, valid_label_code, df_training_new
+     
+   df_train['label_code'] = df_train['label_code'].map(dic_labels)
+   df_test['label_code'] = df_test['label_code'].map(dic_labels)
 
 
+   return df_train, df_test
 
+
+def sanity_check(test_df,train_df, valid_df, dic_labels):
+   df_test = pd.DataFrame(test_df.label_code.value_counts())
+   tt1 = df_test.loc[dic_labels['Bent']]['count'] == 103
+   tt2 = df_test.loc[dic_labels['Compact']]['count'] == 100
+   tt3 = df_test.loc[dic_labels['FRI']]['count'] == 100
+   tt4 = df_test.loc[dic_labels['FRII']]['count'] == 101
+   if tt1 and tt2 and tt3 and tt4:
+      print(f'Test folder is great')
+   else:
+      raise Exception(f'Test folder is incomplete!!')
+
+   df_train = pd.DataFrame(train_df.label_code.value_counts())
+
+   tt1 = df_train.loc[dic_labels['Bent']]['count'] == 305
+   tt2 = df_train.loc[dic_labels['Compact']]['count'] == 226
+   tt3 = df_train.loc[dic_labels['FRI']]['count'] == 215
+   tt4 = df_train.loc[dic_labels['FRII']]['count'] == 434
+
+   if tt1 and tt2 and tt3 and tt4:
+      print(f'Train folder  is great')
+   else:
+      raise Exception(f'Test folder  is incomplete!!')
+   df_valid = pd.DataFrame(valid_df.label_code.value_counts()) 
+   tt1 = df_valid.loc[dic_labels['Bent']]['count'] == 100
+   tt2 = df_valid.loc[dic_labels['Compact']]['count'] == 80
+   tt3 = df_valid.loc[dic_labels['FRI']]['count'] == 74
+   tt4 = df_valid.loc[dic_labels['FRII']]['count'] == 144
+
+   if tt1 and tt2 and tt3 and tt4:
+      print(f'Valid folder  is great')
+   else:
+      raise Exception(f'Test folder  is incomplete!!')
+   print('##################################################')
+   
+
+def get_and_check_data(data_path,data_path_valid,dic_labels):
+
+
+    train_df, valid_test_df = get_data(data_path,dic_labels)
+    _, valid_prev = get_data(data_path_valid,dic_labels)
+    print('valid_prev data shape: ', valid_prev.shape)
+    
+    cols = list(train_df.columns[:150])
+    valid_test_df['id'] = range(valid_test_df.shape[0])
+            
+    valid_df = pd.merge(valid_prev[cols], valid_test_df, on=cols)
+    diff_set = set(np.array(valid_test_df.id)) - set(np.array(valid_df.id))
+    test_df = valid_test_df[valid_test_df['id'].isin(diff_set)]
+    print(valid_df.label_code.value_counts())
+    
+    
+    valid_df.drop(columns=['id'], inplace=True)
+    test_df.drop(columns=['id'], inplace=True)
+
+    print('##################################################')
+    # Verify the data set sizes based on Table 1 of the paper. 
+    print('Train data shape: ', train_df.shape)
+    print('Valid data shape: ', valid_df.shape)                        
+    print('Test data shape: ', test_df.shape)
+    
+    sanity_check(test_df,train_df, valid_df,dic_labels)
+
+    return train_df,valid_df,test_df
+
+
+
+def get_and_check_data_prev(data_path,data_path_valid,data_path_test,dic_labels):
+   
+    train_df, valid_test_df = get_data(data_path,dic_labels)
+    _, valid_prev = get_data(data_path_valid,dic_labels)
+    _, test_prev = get_data(data_path_test,dic_labels)
+    
+    cols = list(train_df.columns[:10])
+    valid_test_df['id'] = range(valid_test_df.shape[0])
+    test_df = pd.merge(test_prev[cols], valid_test_df, on=cols)
+
+    diff_set = set(np.array(valid_test_df.id)) - set(np.array(test_df.id))
+    valid_df = valid_test_df[valid_test_df['id'].isin(diff_set)]
+    valid_df.drop(columns=['id'], inplace=True)
+    test_df.drop(columns=['id'], inplace=True)
+
+    # Rename label_name column:   
+    train_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
+    valid_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
+    test_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
+
+    print('##################################################')
+    # Verify the data set sizes based on Table 1 of the paper. 
+    print('Train data shape: ', train_df.shape)
+    print('Valid data shape: ', valid_df.shape)                        
+    print('Test data shape: ', test_df.shape)
+    
+    sanity_check(test_df,train_df, valid_df,dic_labels)
+
+    return train_df,valid_df,test_df
+
+    
+def clean_vector(vector):
+    # Remove '\n' characters
+    no_newlines = vector.replace('\n', ' ')
+    
+    # Use regex to find all numbers
+    numbers = re.findall(r'-?\d+\.?\d*', no_newlines)
+    
+    # Convert strings to floats
+    float_numbers = [float(num) for num in numbers]
+    
+    # Create numpy array
+    array_vector = np.array(float_numbers)
+    
+    return array_vector
     
 
     
