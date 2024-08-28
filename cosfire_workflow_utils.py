@@ -313,20 +313,6 @@ def get_and_check_data_prev(data_path,data_path_valid,data_path_test,dic_labels)
     return train_df,valid_df,test_df
 
     
-def clean_vector(vector):
-    # Remove '\n' characters
-    no_newlines = vector.replace('\n', ' ')
-    
-    # Use regex to find all numbers
-    numbers = re.findall(r'-?\d+\.?\d*', no_newlines)
-    
-    # Convert strings to floats
-    float_numbers = [float(num) for num in numbers]
-    
-    # Create numpy array
-    array_vector = np.array(float_numbers)
-    
-    return array_vector
-    
+
 
     
