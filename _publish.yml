@@ -1,0 +1,18 @@
+- source: Image_Retrieval_Result_Report_model_8bit_07022023_URSI_Paper.qmd
+  quarto-pub:
+    - id: 5774cbd3-01a2-4723-a68d-9b2d85ffe2b2
+      url: 'https://stevenndungu.quarto.pub/image-retrieval-9c3a'
+    - id: 87a833c3-0950-4963-95bf-cd7cdd6c0233
+      url: 'https://stevenndungu.quarto.pub/image-retrieval-7a07'
+- source: Image_retrieval_comparison.qmd
+  quarto-pub:
+    - id: 79ce7aef-6f0f-479a-bf0b-6a1adce29336
+      url: 'https://stevenndungu.quarto.pub/image-retrieval-6005'
+    - id: 5a4b2ae9-d26a-4bbc-bc6d-9115f9561951
+      url: 'https://stevenndungu.quarto.pub/image-retrieval-2af7'
+- source: gaussian_noise.qmd
+  quarto-pub:
+    - id: b129b65a-4779-4aa8-a9a0-20ced6c37565
+      url: 'https://stevenndungu.quarto.pub/image-retrieval-13b8'
+    - id: d9eb2905-5e6e-43b4-ad13-cb45dcc3f140
+      url: 'https://stevenndungu.quarto.pub/image-retrieval-03cb'

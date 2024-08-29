@@ -1,0 +1,172 @@
+---
+title: "Image Retrieval"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: false
+    highlighting-style: GitHub
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Gaussian Noise in Astronomical images</h2>
+:::
+
+</br>
+
+Step 1: First create a random Gaussian Image with mean=0, standard deviation=1 with the dimension similar to that of our images.
+
+Step 2: Create a Gaussian kernel with peak amplitude of 1 and standard deviation equal to full width at half maximum (fwhm=5) * resolution of the telescope and then convolve on the Gaussian image.
+
+Note: The final images from FIRST, produced by coadding the twelve (or sometimes more) single-field pointings adjacent to each pointing center, have 1.8" pixels, a typical rms of 0.15 mJy, and a resolution of 5".
+
+
+$\text{Number of pixels} = \frac{\text{ Number of arcsecond}}{\text{Resolution (arcseconds per pixel)}}= $
+
+
+```{python}
+#| echo: true
+#| layout-ncol: 3
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image, ImageFilter
+
+# Set the dimensions of the image
+width, height = 150, 150
+
+# Generate a random image with Gaussian distribution (mean 0, sigma 1)
+random_image = np.random.normal(loc=0, scale=1, size=(height, width))
+
+# Plot the image
+plt.imshow(random_image, cmap='gray')
+plt.title('Random Gaussian Image (mean=0, sigma=1)')
+plt.show()
+
+
+# Convert the random image to a PIL Image
+random_image_pil = Image.fromarray((255 * (random_image - np.min(random_image)) / (np.max(random_image) - np.min(random_image))).astype(np.uint8))
+
+
+def gaussian_kernel(size=3, sigma=1):
+    """
+    Create a 2D Gaussian kernel.
+    
+    Parameters:
+    size (int): The dimensions of the kernel (size x size)
+    sigma (float): The standard deviation of the Gaussian distribution
+    
+    Returns:
+    numpy.ndarray: A 2D Gaussian kernel
+    """
+    # Ensure size is odd
+    if size % 2 == 0:
+        raise ValueError("Kernel size must be odd.")
+    
+    # Create a 1D coordinate array
+    ax = np.arange(-(size // 2), size // 2 + 1)
+    
+    # Create 2D coordinate arrays
+    xx, yy = np.meshgrid(ax, ax)
+    
+    # Calculate the 2D Gaussian distribution
+    kernel = np.exp(-(xx**2 + yy**2) / (2 * sigma**2))
+    
+    # Normalize the kernel
+    return kernel / np.sum(kernel)
+
+
+# Now create a 3x3 Gaussian kernel with standard deviation (fwhm*resolution of the telescope) = 5*5 and mean/amplitude of 1
+kernel_3x3 = gaussian_kernel(size=3, sigma=5)
+
+# Convolve the Gaussian filter using PIL
+kernel = kernel_3x3.flatten()  # Flatten the kernel for PIL
+filtered_image = random_image_pil.filter(ImageFilter.Kernel((3, 3), kernel))
+
+
+# Plot the image
+plt.imshow(np.array(filtered_image), cmap='gray')
+plt.title('Resultant Gaussian noise image - V1')
+plt.show()
+
+
+filtered_image1 = random_image_pil.filter(ImageFilter.GaussianBlur(radius=5))
+plt.imshow(np.array(filtered_image1), cmap='gray')
+plt.title('Resultant Gaussian noise image - V2')
+plt.show()
+
+```
+
+Step 3: Add the convolved Gaussian noise image to the image source you have.
+
+```{python}
+#| echo: true
+#| layout-ncol: 3
+
+image = Image.open(r"I:\My Drive\deep_learning\deep_hashing\data_complete\train\Bent\J004151.59+002836.2.jpg")
+
+plt.imshow(np.array(image)[:,:,1], cmap='gray')
+plt.title('Original Image')
+plt.show()
+
+plt.imshow(np.array(filtered_image) + np.array(image)[:,:,1], cmap='gray')
+plt.title('Image with Gausian perturbation - V1')
+plt.show()
+
+
+
+plt.imshow((np.array(filtered_image1) + np.array(image)[:,:,1]), cmap='gray')
+plt.title('Image with Gausian perturbation - V2')
+plt.show()
+```
+
+```{python}
+
+```
+:::

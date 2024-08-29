@@ -1,0 +1,587 @@
+---
+title: "Image Retrieval"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: true
+    highlighting-style: GitHub
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Model Evaluation COSFIRE Filters Approach</h2>
+:::
+
+</br>
+
+
+The results in this presentation are from two experimental designs:
+
+::: {.panel-tabset}
+
+###  Experiment 1 Results
+
+We obtain the 26 statistically significant sets of hyperparameters from the classification paper along with their respective training, validation, and test descriptors. Based on these descriptors, we perform image hashing for each set of descriptors using a selected set of MLP hyperparameters (for the grid search). 
+
+
+::: {.callout-important}
+
+Importantly, each row represents a unique combination of MLP hyperparameters, and every column represents the results yielded by each of the 26 statistically significant sets of descriptors. 
+
+:::
+
+
+
+NB: The code used is [GitHub](https://GitHub.com/stevenndungu/deep_hashing/blob/main/validation_script_17052024.py)
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+###################################################
+# Experiment 1
+###################################################
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+from scipy import stats
+
+from IPython.display import display, Markdown, HTML
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=True)
+from itables import show
+
+import pandas as pd
+import numpy as np
+
+from scipy import stats
+def find_max(row):
+    return row.max()
+
+
+def colsum(x):
+    return sum(np.isnan(x))
+
+
+#%%
+dt_valid  = pd.read_csv("data_results/merged_validation_runs_wide_format_25052024.csv")
+dt_valid.sort_values(by=['mAP_valid_22'], ascending=False, inplace=True)
+
+
+dt_valid1 = dt_valid[dt_valid.columns[list(dt_valid.apply(colsum, axis=0)==0)]]
+
+dt_test  = pd.read_csv("data_results/merged_test_runs_wide_format_25052024.csv")
+dt_test.sort_values(by=['mAP_test_22'], ascending=False, inplace=True)
+
+dt_test = dt_test[dt_test.columns[list(dt_test.apply(colsum, axis=0)==0)]]
+
+
+```
+
+#### Validation Data mAP Results Preview:
+
+Here is the [Google Sheet - Validation Data](https://docs.google.com/spreadsheets/d/1qGltcEiCyVEVmhOki_eRrl1zyGGglFUF9F2XTVoW7jA/edit?usp=sharing) of the data
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+Here is the [Google Sheet - Test Data](https://docs.google.com/spreadsheets/d/1SjQ3_2DeEBWyASPz52Tm2dnUko_4KaB2RsAsh5AdQyg/edit?usp=sharing)  of the data
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+#### Model performance on validation data
+
+</br>
+
+The global maximum row:
+
+```{python}
+
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+dt_valid_sub['max_map'] = dt_valid_sub.apply(find_max, axis=1)
+
+dt_valid_sub['max_map'] = dt_valid_sub.apply(find_max, axis=1)
+dt_valid_sub.sort_values(by='max_map', ascending=False, inplace=True)
+
+#maximum Value
+dt_valid_sub['max_map'].max()
+#########
+
+
+# extract max value row.
+max_index = dt_valid_sub['max_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Statistical Significance:
+
+
+Using the global maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1][~np.isnan(max_row[:-1])], dt_valid_sub.loc[index][:-1][~np.isnan(dt_valid_sub.loc[index][:-1])], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value>=0.05)*1)
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+show(dt_valid_sub1)
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+::: {.panel-tabset}
+
+#### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.describe().iloc[1:3]
+
+res1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+#### Model performance on Test data
+</br>
+We then pply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['max_map'] = test_data_1_sub.apply(find_max, axis=1)
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+
+</br>
+
+Deep dive in thresholding:
+
+::: {.panel-tabset}
+
+#### Descriptors - 22
+
+::: {#fig-map_loss_curves layout-ncol=2}
+
+![mAP curves](Maps_curves22.png){#fig-map22}
+
+![Loss curves](Train_valid_curves_22.png){#fig-loss_curves22}
+
+Train, Validation and Test Descriptors hyperparameter set 22
+:::
+  
+#### Descriptors - 26
+
+::: {#fig-map_loss_curves2 layout-ncol=2}
+
+![mAP curves](Maps_curves26.png){#fig-map26}
+
+![Loss curves](Train_valid_curves26.png){#fig-loss_curves26}
+
+Train, Validation and Test Descriptors hyperparameter set 26
+
+:::
+
+#### Hold-out 
+
+::: {#fig-map_loss_curves3 layout-ncol=2}
+
+![mAP curves](Maps_curves_split.png){#fig-map3}
+
+![mAP curves](Train_valid_curves26.png){#fig-map31}
+
+Train (valid-holdout),  and Test Descriptors - best of the 26 hyperparameter set 
+:::
+
+:::
+
+### Experiment 2 Results
+
+In Experiment 2, we obtained the train and test decriptors of the best validation accuracy from the 26 sets of hyperparameters that achieved statistically significant COSFIRE filters with the validation set during the classification study. Subsequently, the training dataset was divided into training and validation subsets using a hold-out methodology at a ratio of 9:1, which was empirically found to be an optimal hold-out ratio.
+
+We then conducted 10 runs for each MLP hyperparameter set during the grid search.
+
+::: {.callout-tip}
+
+Each row represents a unique combination of MLP hyperparameters, and every column represents the results yielded by each of the 10 random runs on the training dataset. The numbers 2, 12, 22,..., 92 represents the seed values used for reproducibility.
+
+:::
+
+
+::: {.callout-important}
+This is the approach that was discussed in the last meeting. I have included it in this presentation since I already had some preliminary results and are useful for comparisons.
+:::
+
+NB: The code used is [GitHub](https://GitHub.com/stevenndungu/deep_hashing/blob/main/validation_script_grid_search_17052024.py)
+
+```{python}
+#| echo: false
+#| code-fold: false
+###################################################
+# Experiment 2
+###################################################
+
+
+df_base_valid = pd.read_csv("I:/My Drive/deep_learning/deep_hashing/deep_hashing_GitHub/COSFIRE_26_valid_hyperparameters_descriptors/model_selection_valid_and_13052024_model7_wide_format.csv")
+
+df_base_test= pd.read_csv("I:/My Drive/deep_learning/deep_hashing/deep_hashing_GitHub/COSFIRE_26_valid_hyperparameters_descriptors/model_selection_test_and_13052024_model7_wide_format.csv")
+  
+```
+
+
+#### Validation Data mAP Results Preview:
+
+Here is the [Google Sheet Version](https://docs.google.com/spreadsheets/d/1WC40gNFsJhQhw-EFt95JxJcUxgIWqykV_nN-a_jXGT0/edit?usp=sharing) of the data
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+html_table = df_base_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+#### Test Data mAP Results Preview:
+
+Here is the [Google Sheet Version](https://docs.google.com/spreadsheets/d/1-AdJzAh8rlWpNatnJaxAs9fAZWmYss-miFYamn219e4/edit?usp=sharing) of the data
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+html_table = df_base_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+</br>
+
+The global maximum row:
+
+
+```{python}
+
+
+################
+df_base_valid_st = df_base_valid[list(df_base_valid.columns[df_base_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+df_base_valid_st['max_map'] = df_base_valid_st.apply(find_max, axis=1)
+
+df_base_valid['max_map'] = df_base_valid.apply(find_max, axis=1)
+df_base_valid_st.sort_values(by='max_map', ascending=False, inplace=True)
+
+#maximum Value
+df_base_valid_st['max_map'].max()
+
+
+# extract max value row.
+max_index = df_base_valid_st['max_map'].idxmax()
+max_row = df_base_valid_st.loc[max_index]
+#print(max_row)
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd_st = df_base_valid_st.head(1)
+
+html_table = dd_st.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+</br>
+
+#### Statstical Significance:
+
+
+
+```{python}
+
+pvalues = []
+
+for _,index in enumerate(df_base_valid_st.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], df_base_valid_st.loc[index][:-1], alternative='greater')
+  pvalues.append((p_value>=0.05)*1)
+  
+  
+df_base_valid_st['sig'] = pvalues
+df_base_valid_st1 = df_base_valid_st.query('sig == 1')
+
+
+max_indexx = df_base_valid_st1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+show(df_base_valid_st1)
+
+```
+
+::: {.panel-tabset}
+
+#### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res_st = df_base_valid_st1.describe().iloc[1:3]
+
+res1 = res_st.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+#### Model performance on Test data
+</br>
+We then pply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = df_base_valid.iloc[df_base_valid_st1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, df_base_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test_seed')])]
+test_data_1['max_map'] = test_data_1_sub.apply(find_max, axis=1)
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+res_1 = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test_seed')]) + ['average_map']]
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res1 = res_1.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+
+::: 
+
+
+:::
+:::

@@ -1,166 +1,162 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
+*.pyc*
 *.so
+*.pyd
+*~
+.#*
+*.lprof
+*.swp
+*.swo
+.DS_Store
+build
+sklearn/datasets/__config__.py
+sklearn/**/*.html
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
+doc/sg_execution_times.rst
+doc/_build/
+doc/api/*.rst
+doc/auto_examples/
+doc/css/*
+!doc/css/.gitkeep
+doc/modules/generated/
+doc/datasets/generated/
+doc/index.rst
+doc/min_dependency_table.rst
+doc/min_dependency_substitutions.rst
+*.pdf
 pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
+scikit_learn.egg-info/
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
+coverage
 *.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+.tags*
+tags
+covtype.data.gz
+20news-18828/
+20news-18828.tar.gz
+coverages.zip
+samples.zip
+doc/coverages.zip
+doc/samples.zip
+coverages
+samples
+doc/coverages
+doc/samples
+*.prof
+.tox/
+.coverage
+pip-wheel-metadata
 
-# Translations
-*.mo
-*.pot
+lfw_preprocessed/
+nips2010_pdf/
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+*.nt.bz2
+*.tar.gz
+*.tgz
 
-# Flask stuff:
-instance/
-.webassets-cache
+examples/cluster/joblib
+reuters/
+benchmarks/bench_covertype_data/
+benchmarks/HIGGS.csv.gz
+bench_pca_solvers.csv
 
-# Scrapy stuff:
-.scrapy
+*.prefs
+.pydevproject
+.idea
+.vscode
+# used by pyenv
+.python-version
 
-# Sphinx documentation
-docs/_build/
+*.c
+*.cpp
 
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
-.pdm.toml
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
-
-#data files
+!/**/src/**/*.c
+!/**/src/**/*.cpp
+*.sln
+*.pyproj
+data_gnoise_f05.zip
+data_gnoise_f05/
+data_gnoise_f1/
+data_gnoise_f3/
+data_gnoise_f5.zip
+data_gnoise_f5/
+data_gnoise_f5v2.zip
+overall_noise_results/
+paper images 28082024/
+cosfire_rg_classification/
+radio_v3/
+paper images/
+.quarto/
+data/
+utils/
+*.zip
+*.json
 *.csv
+<<<<<<< HEAD
+*.jpg
+*.mat
+# Used by py.test
+.cache
+.pytest_cache/
+_configtest.o.d
+utils/
+# Used by mypy
+.mypy_cache/
+test/
+Train_valid_curves_with_reg
+# virtualenv from advanced installation guide
+sklearn-env/
+scikit-learn/
+results_folder/
+MLP_test_2/
+models/
+FINAL_Best1_1/
+radio/
+*.xlsx
+*.docx
+*.data
+*.txt
+descriptors and code extraction/
+*.jpeg
+data-balanced/
+data_g_noise/
+data_results/
+Multi-Layer-Perceptron-Pytorch/
+final paper results/
+# files generated from a template
+sklearn/_loss/_loss.pyx
+sklearn/utils/_seq_dataset.pyx
+sklearn/utils/_seq_dataset.pxd
+sklearn/utils/_weight_vector.pyx
+sklearn/utils/_weight_vector.pxd
+sklearn/linear_model/_sag_fast.pyx
+sklearn/linear_model/_sgd_fast.pyx
+sklearn/metrics/_dist_metrics.pyx
+sklearn/metrics/_dist_metrics.pxd
+sklearn/metrics/_pairwise_distances_reduction/_argkmin.pxd
+sklearn/metrics/_pairwise_distances_reduction/_argkmin.pyx
+sklearn/metrics/_pairwise_distances_reduction/_argkmin_classmode.pyx
+sklearn/metrics/_pairwise_distances_reduction/_base.pxd
+sklearn/metrics/_pairwise_distances_reduction/_base.pyx
+sklearn/metrics/_pairwise_distances_reduction/_datasets_pair.pxd
+sklearn/metrics/_pairwise_distances_reduction/_datasets_pair.pyx
+sklearn/metrics/_pairwise_distances_reduction/_middle_term_computer.pxd
+sklearn/metrics/_pairwise_distances_reduction/_middle_term_computer.pyx
+sklearn/metrics/_pairwise_distances_reduction/_radius_neighbors.pxd
+sklearn/metrics/_pairwise_distances_reduction/_radius_neighbors.pyx
+sklearn/metrics/_pairwise_distances_reduction/_radius_neighbors_classmode.pyx
+sklearn/neighbors/_ball_tree.pyx
+sklearn/neighbors/_binary_tree.pxi
+sklearn/neighbors/_kd_tree.pyx
+
+# Default JupyterLite content
+jupyterlite_contents
+/paper images/
+*.svg
+*.png
+inal paper results/
+=======
 *.mat
 models/
 *.pth
@@ -175,3 +171,4 @@ Train_valid_curves2
 Train_valid_curves3
 data_results/
 model_selection_valid_and_test_20052024.gsheet
+>>>>>>> 7f842b1df81eb088a93a75765db0735c79f71bc3

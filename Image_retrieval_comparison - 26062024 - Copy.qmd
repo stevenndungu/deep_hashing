@@ -1,0 +1,5491 @@
+---
+title: "Image Retrieval"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: true
+    highlighting-style: GitHub
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Model Evaluation COSFIRE Filters Approach</h2>
+:::
+
+</br>
+
+# Introduction
+
+
+We obtain the 26 statistically significant sets of hyperparameters from the classification paper along with their respective training, validation, and test descriptors. Based on these descriptors, we perform image hashing for each set of descriptors using a selected set of MLP hyperparameters (for the grid search). 
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+###################################################
+# Experiment 1
+###################################################
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+import os
+os.environ['PYTHONHASHSEED'] = 'python'
+from scipy import stats
+
+from IPython.display import display, Markdown, HTML
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=True)
+from itables import show
+
+import torch.nn as nn
+
+import plotly.express as px
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.io as pio
+pio.renderers.default = "notebook"
+
+import pandas as pd
+import numpy as np
+import re
+from scipy import stats
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+def find_max(row):
+    return row.max()
+
+
+def colsum(x):
+    return sum(np.isnan(x))
+
+layer_vsn = 'v3_layers_v2'
+# l1_reg_values = [0,0.0001, 0.00001, 1e-8]
+# l2_reg_values = [0,0.0001, 0.00001, 1e-8]
+
+l1_reg_values = [0,1e-8]
+l2_reg_values = [0,1e-8]
+
+query = (
+    "output_size == @output_size and "
+    "l1_reg in @l1_reg_values and "
+    "l2_reg in @l2_reg_values"
+)
+
+
+```
+
+The outputs below represent an example of a single experiment based on an array of hyperparameters considered to determine the optimal configuration of the MLP hashing architecture (For bit size 32).
+
+::: {.panel-tabset}
+
+## Model structure
+
+![](hyperparameter_range.png)
+
+
+```{python}
+#| echo: true
+#| output: true
+#| code-fold: true
+
+class CosfireNet(nn.Module):
+    def __init__(self, input_size, bitsize, l1_reg, l2_reg):
+        super(CosfireNet, self).__init__()
+        self.l1_reg = l1_reg
+        self.l2_reg = l2_reg
+        self.hd = nn.Sequential(
+            nn.Linear(input_size, 300),
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200),
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, bitsize),
+            nn.Tanh()
+        )
+    def forward(self, x):
+        regularization_loss = 0.0
+        for param in self.hd.parameters():
+            regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+            regularization_loss += torch.sum(param ** 2) * self.l2_reg  # L2 regularization
+        return self.hd(x), regularization_loss
+```
+
+
+
+## Density plots
+
+![](density_plot_24062024.png)
+
+## mAP Curves
+
+![](Maps_curves_abs_values_24062024.png)
+
+## T-SNE_projection plots
+
+![](T-SNE_projection_24062024.png)
+
+## Loss curves
+::: {.column-screen layout-ncol=2}
+
+![Without regularization](Train_valid_curves.png)
+
+![With regularization](Train_valid_curves_random.png)
+
+:::
+
+:::
+
+
+::: {.callout-tip}
+
+tiply, each row represents a unique combination of MLP hyperparameters, and every column represents the results yielded by each of the 26 statistically significant sets of descriptors. 
+
+:::
+
+</br>
+
+::: {.panel-tabset}
+
+
+In these experiments, we have considered four different bit sizes.
+
+
+##  Bit size 32
+
+
+The results in this presentation are from two experimental designs:
+
+::: {.panel-tabset}
+
+###  Experiment 1 Results
+
+The thresholding is based on fixed values between -1 and 1 on a step size of 0.1.
+
+
+
+::: {.panel-tabset}
+
+
+
+
+```{python}
+
+#%%
+
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_validation_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_test_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+
+output_size = 32
+
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+```
+
+#### Validation Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+::: {.panel-tabset}
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+
+#########
+
+
+# extract max value row.
+
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Model performance on validation data (T-test)
+
+
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value >= 0.05)*1)
+
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+dt = dt_valid.loc[dt_valid_sub1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params1 = dt_valid.loc[dt_valid_sub1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params = optimal_params1.reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_1 = test_data_1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_1.shape)
+```
+
+
+Difference
+
+```{python}
+diff = dt[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt.columns,test_data_1.columns)):   
+   diff[f'col_diff_{i}'] = (np.array(dt[cols[0]]) - np.array(test_data_1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff['negative_count'] = diff.apply(count_negatives, axis=1)
+diff.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+html_table = diff.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# 
+# show(diff)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+
+```
+
+
+
+##### Model performance on Test data
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])+ ['average_map']]
+
+res_test1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+
+```
+
+
+
+:::
+
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+Difference
+
+```{python}
+diff_mw = dt_mw[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt_mw.columns,test_data_mw1.columns)):   
+   diff_mw[f'col_diff_{i}'] = (np.array(dt_mw[cols[0]]) - np.array(test_data_mw1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+
+diff_mw.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+
+html_table = diff_mw.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+key_values = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']
+print('Are the keys of the valid and test dfs same?: ',dt_mw[key_values].equals(test_data_mw1[key_values]))
+
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+# show(diff)
+```
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid2 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid2.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res_test2 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test2.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+:::
+
+</br>
+
+
+Summary using radar plot
+
+```{python}
+#| layout-ncol: 2
+#| 
+def extract_number(text):
+    if isinstance(text, str):
+        matches = re.findall(r'\d+', text)
+        return int(matches[0]) if matches else 1
+    return 1
+
+res_valid1['id'] = res_valid1.index.to_series().apply(extract_number)
+res_test1['id'] = res_test1.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res_valid1,res_test1])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test1 = res_test1.sort_values(by=['id']).reset_index().query("index !='average_map'")
+data_range1 = np.array(list(res_test1['mean']) + list(res_valid1['mean']))
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res_test1['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res_valid1['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "T-Test",
+        'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range1.min()), round(data_range1.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+##############
+
+
+res_valid2['id'] = res_valid2.index.to_series().apply(extract_number)
+res_test2['id'] = res_test2.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res_valid2,res_test2])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test2 = res_test2.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range2 = np.array(list(res_test2['mean']) + list(res_valid2['mean']))
+
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res_test2['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res_valid2['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "MU-Test",
+         'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range2.min()), round(data_range2.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+```
+
+</br>
+
+</br>
+
+</br>
+
+### Experiment 2 Results
+
+
+- In these experimental results, the thresholding is based on a fixed value of 0. This decision is informed by the fact that the binary-like hash values are symmetrically distributed between -1 and 1.
+
+
+
+
+::: {.panel-tabset}
+
+
+
+
+```{python}
+
+#%%
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_validation_runs_wide_format_zero_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_test_runs_wide_format_zero_13062024_{layer_vsn}.csv")
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+
+```
+
+
+#### Validation Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+::: {.panel-tabset}
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+#########
+
+
+# extract max value row.
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Model performance on validation data (T-test)
+
+
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value >= 0.05)*1)
+
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+dt = dt_valid.loc[dt_valid_sub1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params1 = dt_valid.loc[dt_valid_sub1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params = optimal_params1.reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_1 = test_data_1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_1.shape)
+```
+
+
+Difference
+
+```{python}
+diff = dt[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt.columns,test_data_1.columns)):   
+   diff[f'col_diff_{i}'] = (np.array(dt[cols[0]]) - np.array(test_data_1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff['negative_count'] = diff.apply(count_negatives, axis=1)
+diff.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+html_table = diff.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# 
+# show(diff)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.iloc[:,:-3].describe().iloc[1:3]
+
+res1_valid = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+
+##### Model performance on Test data
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+
+
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res1_test = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+Difference
+
+```{python}
+diff_mw = dt_mw[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt_mw.columns,test_data_mw1.columns)):   
+   diff_mw[f'col_diff_{i}'] = (np.array(dt_mw[cols[0]]) - np.array(test_data_mw1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+
+diff_mw.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+
+html_table = diff_mw.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# show(diff)
+```
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res2_valid = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res2_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res2_test = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res2_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+:::
+
+</br>
+
+
+Summary using radar plot
+
+```{python}
+#| layout-ncol: 2
+
+res1_valid['id'] = res1_valid.index.to_series().apply(extract_number)
+res1_test['id'] = res1_test.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res1_valid,res1_test])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res1_test = res1_test.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range1 = np.array(list(res1_valid['mean']) + list(res1_test['mean']))
+
+categories = [str(i) for i in range(1,26)]
+
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res1_test['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res1_valid['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "T-Test",
+        'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range1.min()), round(data_range1.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+
+
+
+##############
+
+
+res2_valid['id'] = res2_valid.index.to_series().apply(extract_number)
+res2_test['id'] = res2_test.index.to_series().apply(extract_number)
+
+
+res_comb = pd.concat([res2_valid,res2_test])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res2_test = res2_test.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range2 = np.array(list(res2_valid['mean']) + list(res2_test['mean']))
+
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res2_test['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res2_valid['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "MU-Test",
+         'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range2.min()), round(data_range2.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+best_valid_bit_size_32 = round(res1_valid['mean'][0])
+id_best_valid = res1_valid['id'][0]
+best_test_bit_size_32 = list(round(res1_test.query('id == @id_best_valid')['mean'],2))[0]
+
+best_valid_bit_size_32_mw = round(res2_valid['mean'][0])
+id_best_valid = res2_valid['id'][0]
+best_test_bit_size_32_mw = list(round(res2_test.query('id == @id_best_valid')['mean'],2))[0]
+
+```
+
+</br>
+
+</br>
+
+</br>
+
+
+
+:::
+
+
+##  Bit size 48
+
+
+The results in this presentation are from two experimental designs:
+
+::: {.panel-tabset}
+
+###  Experiment 1 Results
+
+The thresholding is based on fixed values between -1 and 1 on a step size of 0.1.
+
+
+
+::: {.panel-tabset}
+
+
+
+
+```{python}
+
+#%%
+
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_validation_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_test_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+
+output_size = 48
+
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+```
+
+#### Validation Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+::: {.panel-tabset}
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+
+#########
+
+
+# extract max value row.
+
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Model performance on validation data (T-test)
+
+
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value >= 0.05)*1)
+
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+dt = dt_valid.loc[dt_valid_sub1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params1 = dt_valid.loc[dt_valid_sub1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params = optimal_params1.reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_1 = test_data_1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_1.shape)
+```
+
+
+Difference
+
+```{python}
+diff = dt[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt.columns,test_data_1.columns)):   
+   diff[f'col_diff_{i}'] = (np.array(dt[cols[0]]) - np.array(test_data_1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff['negative_count'] = diff.apply(count_negatives, axis=1)
+diff.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+html_table = diff.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# 
+# show(diff)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+
+```
+
+
+
+##### Model performance on Test data
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])+ ['average_map']]
+
+res_test1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+
+```
+
+
+
+:::
+
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+Difference
+
+```{python}
+diff_mw = dt_mw[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt_mw.columns,test_data_mw1.columns)):   
+   diff_mw[f'col_diff_{i}'] = (np.array(dt_mw[cols[0]]) - np.array(test_data_mw1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+
+diff_mw.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+
+html_table = diff_mw.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+key_values = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']
+print('Are the keys of the valid and test dfs same?: ',dt_mw[key_values].equals(test_data_mw1[key_values]))
+
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+# show(diff)
+```
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid2 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid2.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res_test2 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test2.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+:::
+
+</br>
+
+
+Summary using radar plot
+
+```{python}
+#| layout-ncol: 2
+#| 
+def extract_number(text):
+    if isinstance(text, str):
+        matches = re.findall(r'\d+', text)
+        return int(matches[0]) if matches else 1
+    return 1
+
+res_valid1['id'] = res_valid1.index.to_series().apply(extract_number)
+res_test1['id'] = res_test1.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res_valid1,res_test1])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test1 = res_test1.sort_values(by=['id']).reset_index().query("index !='average_map'")
+data_range1 = np.array(list(res_test1['mean']) + list(res_valid1['mean']))
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res_test1['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res_valid1['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "T-Test",
+        'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range1.min()), round(data_range1.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+##############
+
+
+res_valid2['id'] = res_valid2.index.to_series().apply(extract_number)
+res_test2['id'] = res_test2.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res_valid2,res_test2])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test2 = res_test2.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range2 = np.array(list(res_test2['mean']) + list(res_valid2['mean']))
+
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res_test2['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res_valid2['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "MU-Test",
+         'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range2.min()), round(data_range2.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+```
+
+</br>
+
+</br>
+
+</br>
+
+### Experiment 2 Results
+
+
+- In these experimental results, the thresholding is based on a fixed value of 0. This decision is informed by the fact that the binary-like hash values are symmetrically distributed between -1 and 1.
+
+
+
+
+::: {.panel-tabset}
+
+
+
+
+```{python}
+
+#%%
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_validation_runs_wide_format_zero_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_test_runs_wide_format_zero_13062024_{layer_vsn}.csv")
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+
+```
+
+
+#### Validation Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+::: {.panel-tabset}
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+#########
+
+
+# extract max value row.
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Model performance on validation data (T-test)
+
+
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value >= 0.05)*1)
+
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+dt = dt_valid.loc[dt_valid_sub1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params1 = dt_valid.loc[dt_valid_sub1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params = optimal_params1.reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_1 = test_data_1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_1.shape)
+```
+
+
+Difference
+
+```{python}
+diff = dt[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt.columns,test_data_1.columns)):   
+   diff[f'col_diff_{i}'] = (np.array(dt[cols[0]]) - np.array(test_data_1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff['negative_count'] = diff.apply(count_negatives, axis=1)
+diff.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+html_table = diff.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# 
+# show(diff)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.iloc[:,:-3].describe().iloc[1:3]
+
+res1_valid = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+
+##### Model performance on Test data
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+
+
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res1_test = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+Difference
+
+```{python}
+diff_mw = dt_mw[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt_mw.columns,test_data_mw1.columns)):   
+   diff_mw[f'col_diff_{i}'] = (np.array(dt_mw[cols[0]]) - np.array(test_data_mw1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+
+diff_mw.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+
+html_table = diff_mw.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# show(diff)
+```
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res2_valid = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res2_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res2_test = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res2_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+:::
+
+</br>
+
+
+Summary using radar plot
+
+```{python}
+#| layout-ncol: 2
+
+res1_valid['id'] = res1_valid.index.to_series().apply(extract_number)
+res1_test['id'] = res1_test.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res1_valid,res1_test])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res1_test = res1_test.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range1 = np.array(list(res1_valid['mean']) + list(res1_test['mean']))
+
+categories = [str(i) for i in range(1,26)]
+
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res1_test['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res1_valid['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "T-Test",
+        'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range1.min()), round(data_range1.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+
+
+
+##############
+
+
+res2_valid['id'] = res2_valid.index.to_series().apply(extract_number)
+res2_test['id'] = res2_test.index.to_series().apply(extract_number)
+
+
+res_comb = pd.concat([res2_valid,res2_test])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res2_test = res2_test.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range2 = np.array(list(res2_valid['mean']) + list(res2_test['mean']))
+
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res2_test['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res2_valid['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "MU-Test",
+         'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range2.min()), round(data_range2.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+best_valid_bit_size_48 = round(res1_valid['mean'][0])
+id_best_valid = res1_valid['id'][0]
+best_test_bit_size_48 = list(round(res1_test.query('id == @id_best_valid')['mean'],2))[0]
+
+best_valid_bit_size_48_mw = round(res2_valid['mean'][0])
+id_best_valid = res2_valid['id'][0]
+best_test_bit_size_48_mw = list(round(res2_test.query('id == @id_best_valid')['mean'],2))[0]
+
+```
+
+</br>
+
+</br>
+
+</br>
+
+
+:::
+
+##  Bit size 16 
+
+
+The results in this presentation are from two experimental designs:
+
+::: {.panel-tabset}
+
+###  Experiment 1 Results
+
+The thresholding is based on fixed values between -1 and 1 on a step size of 0.1.
+
+
+
+::: {.panel-tabset}
+
+
+
+
+```{python}
+
+#%%
+
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_validation_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_test_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+
+output_size = 16
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+```
+
+#### Validation Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+::: {.panel-tabset}
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+
+#########
+
+
+# extract max value row.
+
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Model performance on validation data (T-test)
+
+
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value >= 0.05)*1)
+
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+dt = dt_valid.loc[dt_valid_sub1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params1 = dt_valid.loc[dt_valid_sub1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params = optimal_params1.reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_1 = test_data_1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_1.shape)
+```
+
+
+Difference
+
+```{python}
+diff = dt[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt.columns,test_data_1.columns)):   
+   diff[f'col_diff_{i}'] = (np.array(dt[cols[0]]) - np.array(test_data_1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff['negative_count'] = diff.apply(count_negatives, axis=1)
+diff.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+html_table = diff.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# 
+# show(diff)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+
+```
+
+
+
+##### Model performance on Test data
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])+ ['average_map']]
+
+res_test1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+
+```
+
+
+
+:::
+
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+Difference
+
+```{python}
+diff_mw = dt_mw[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt_mw.columns,test_data_mw1.columns)):   
+   diff_mw[f'col_diff_{i}'] = (np.array(dt_mw[cols[0]]) - np.array(test_data_mw1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+
+diff_mw.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+
+html_table = diff_mw.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+key_values = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']
+print('Are the keys of the valid and test dfs same?: ',dt_mw[key_values].equals(test_data_mw1[key_values]))
+
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+# show(diff)
+```
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid2 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid2.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res_test2 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test2.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+:::
+
+</br>
+
+
+Summary using radar plot
+
+```{python}
+#| layout-ncol: 2
+#| 
+def extract_number(text):
+    if isinstance(text, str):
+        matches = re.findall(r'\d+', text)
+        return int(matches[0]) if matches else 1
+    return 1
+
+res_valid1['id'] = res_valid1.index.to_series().apply(extract_number)
+res_test1['id'] = res_test1.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res_valid1,res_test1])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test1 = res_test1.sort_values(by=['id']).reset_index().query("index !='average_map'")
+data_range1 = np.array(list(res_test1['mean']) + list(res_valid1['mean']))
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res_test1['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res_valid1['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "T-Test",
+        'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range1.min()), round(data_range1.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+##############
+
+
+res_valid2['id'] = res_valid2.index.to_series().apply(extract_number)
+res_test2['id'] = res_test2.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res_valid2,res_test2])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test2 = res_test2.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range2 = np.array(list(res_test2['mean']) + list(res_valid2['mean']))
+
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res_test2['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res_valid2['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "MU-Test",
+         'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range2.min()), round(data_range2.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+```
+
+</br>
+
+</br>
+
+</br>
+
+### Experiment 2 Results
+
+
+- In these experimental results, the thresholding is based on a fixed value of 0. This decision is informed by the fact that the binary-like hash values are symmetrically distributed between -1 and 1.
+
+
+
+
+::: {.panel-tabset}
+
+
+
+
+```{python}
+
+#%%
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_validation_runs_wide_format_zero_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_test_runs_wide_format_zero_13062024_{layer_vsn}.csv")
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+
+```
+
+
+#### Validation Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+::: {.panel-tabset}
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+#########
+
+
+# extract max value row.
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Model performance on validation data (T-test)
+
+
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value >= 0.05)*1)
+
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+dt = dt_valid.loc[dt_valid_sub1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params1 = dt_valid.loc[dt_valid_sub1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params = optimal_params1.reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_1 = test_data_1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_1.shape)
+```
+
+
+Difference
+
+```{python}
+diff = dt[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt.columns,test_data_1.columns)):   
+   diff[f'col_diff_{i}'] = (np.array(dt[cols[0]]) - np.array(test_data_1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff['negative_count'] = diff.apply(count_negatives, axis=1)
+diff.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+html_table = diff.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# 
+# show(diff)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.iloc[:,:-3].describe().iloc[1:3]
+
+res1_valid = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+
+##### Model performance on Test data
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+
+
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res1_test = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+Difference
+
+```{python}
+diff_mw = dt_mw[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt_mw.columns,test_data_mw1.columns)):   
+   diff_mw[f'col_diff_{i}'] = (np.array(dt_mw[cols[0]]) - np.array(test_data_mw1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+
+diff_mw.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+
+html_table = diff_mw.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# show(diff)
+```
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res2_valid = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res2_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res2_test = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res2_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+:::
+
+</br>
+
+
+Summary using radar plot
+
+```{python}
+#| layout-ncol: 2
+
+res1_valid['id'] = res1_valid.index.to_series().apply(extract_number)
+res1_test['id'] = res1_test.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res1_valid,res1_test])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res1_test = res1_test.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range1 = np.array(list(res1_valid['mean']) + list(res1_test['mean']))
+
+categories = [str(i) for i in range(1,26)]
+
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res1_test['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res1_valid['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "T-Test",
+        'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range1.min()), round(data_range1.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+
+
+
+##############
+
+
+res2_valid['id'] = res2_valid.index.to_series().apply(extract_number)
+res2_test['id'] = res2_test.index.to_series().apply(extract_number)
+
+
+res_comb = pd.concat([res2_valid,res2_test])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res2_test = res2_test.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range2 = np.array(list(res2_valid['mean']) + list(res2_test['mean']))
+
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res2_test['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res2_valid['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "MU-Test",
+         'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range2.min()), round(data_range2.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+best_valid_bit_size_16 = round(res1_valid['mean'][0])
+id_best_valid = res1_valid['id'][0]
+best_test_bit_size_16 = list(round(res1_test.query('id == @id_best_valid')['mean'],2))[0]
+
+best_valid_bit_size_16_mw = round(res2_valid['mean'][0])
+id_best_valid = res2_valid['id'][0]
+best_test_bit_size_16_mw = list(round(res2_test.query('id == @id_best_valid')['mean'],2))[0]
+
+
+
+```
+
+</br>
+
+</br>
+
+</br>
+
+
+
+:::
+
+##  Bit size 8 
+
+
+The results in this presentation are from two experimental designs:
+
+::: {.panel-tabset}
+
+###  Experiment 1 Results
+
+The thresholding is based on fixed values between -1 and 1 on a step size of 0.1.
+
+
+
+::: {.panel-tabset}
+
+
+
+
+```{python}
+
+#%%
+
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_validation_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_test_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+
+output_size = 8
+
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+```
+
+#### Validation Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+::: {.panel-tabset}
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+
+#########
+
+
+# extract max value row.
+
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Model performance on validation data (T-test)
+
+
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value >= 0.05)*1)
+
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+dt = dt_valid.loc[dt_valid_sub1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params1 = dt_valid.loc[dt_valid_sub1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params = optimal_params1.reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_1 = test_data_1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_1.shape)
+```
+
+
+Difference
+
+```{python}
+diff = dt[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt.columns,test_data_1.columns)):   
+   diff[f'col_diff_{i}'] = (np.array(dt[cols[0]]) - np.array(test_data_1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff['negative_count'] = diff.apply(count_negatives, axis=1)
+diff.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+html_table = diff.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# 
+# show(diff)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+
+```
+
+
+
+##### Model performance on Test data
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])+ ['average_map']]
+
+res_test1 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+
+```
+
+
+
+:::
+
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+Difference
+
+```{python}
+diff_mw = dt_mw[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt_mw.columns,test_data_mw1.columns)):   
+   diff_mw[f'col_diff_{i}'] = (np.array(dt_mw[cols[0]]) - np.array(test_data_mw1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+
+diff_mw.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+
+html_table = diff_mw.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+key_values = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']
+print('Are the keys of the valid and test dfs same?: ',dt_mw[key_values].equals(test_data_mw1[key_values]))
+
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+# show(diff)
+```
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid2 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid2.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res_test2 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test2.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+:::
+
+</br>
+
+
+Summary using radar plot
+
+```{python}
+#| layout-ncol: 2
+#| 
+def extract_number(text):
+    if isinstance(text, str):
+        matches = re.findall(r'\d+', text)
+        return int(matches[0]) if matches else 1
+    return 1
+
+res_valid1['id'] = res_valid1.index.to_series().apply(extract_number)
+res_test1['id'] = res_test1.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res_valid1,res_test1])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test1 = res_test1.sort_values(by=['id']).reset_index().query("index !='average_map'")
+data_range1 = np.array(list(res_test1['mean']) + list(res_valid1['mean']))
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res_test1['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res_valid1['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "T-Test",
+        'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range1.min()), round(data_range1.max()) + 1 + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+##############
+
+
+res_valid2['id'] = res_valid2.index.to_series().apply(extract_number)
+res_test2['id'] = res_test2.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res_valid2,res_test2])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test2 = res_test2.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range2 = np.array(list(res_test2['mean']) + list(res_valid2['mean']))
+
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res_test2['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res_valid2['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "MU-Test",
+         'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range2.min()), round(data_range2.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+```
+
+</br>
+
+</br>
+
+</br>
+
+### Experiment 2 Results
+
+
+- In these experimental results, the thresholding is based on a fixed value of 0. This decision is informed by the fact that the binary-like hash values are symmetrically distributed between -1 and 1.
+
+
+
+
+::: {.panel-tabset}
+
+
+
+
+```{python}
+
+#%%
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_validation_runs_wide_format_zero_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers_v2/merged_test_runs_wide_format_zero_13062024_{layer_vsn}.csv")
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+
+```
+
+
+#### Validation Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+::: {.panel-tabset}
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+#########
+
+
+# extract max value row.
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(1)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 100px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+#### Model performance on validation data (T-test)
+
+
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues = []
+pvalues_real = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues_real.append(p_value)
+  pvalues.append((p_value >= 0.05)*1)
+
+  
+
+dt_valid_sub['pvalues'] = pvalues_real
+dt_valid_sub['sig'] = pvalues
+
+
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+dt = dt_valid.loc[dt_valid_sub1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub.shape)
+
+print('Size of the Sig data: ',dt_valid_sub1.shape)
+
+```
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params1 = dt_valid.loc[dt_valid_sub1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params = optimal_params1.reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_1 = test_data_1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_1.shape)
+```
+
+
+Difference
+
+```{python}
+diff = dt[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt.columns,test_data_1.columns)):   
+   diff[f'col_diff_{i}'] = (np.array(dt[cols[0]]) - np.array(test_data_1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff['negative_count'] = diff.apply(count_negatives, axis=1)
+diff.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+html_table = diff.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# 
+# show(diff)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub1.iloc[:,:-3].describe().iloc[1:3]
+
+res1_valid = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+
+##### Model performance on Test data
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+
+
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res1_test = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res1_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+Difference
+
+```{python}
+diff_mw = dt_mw[['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+for i, cols in enumerate(zip(dt_mw.columns,test_data_mw1.columns)):   
+   diff_mw[f'col_diff_{i}'] = (np.array(dt_mw[cols[0]]) - np.array(test_data_mw1[cols[1]]))*-1
+
+# Function to count negatives in a row
+def count_negatives(row):
+    return sum(1 for value in row if isinstance(value, (int, float)) and value < 0)
+
+diff_mw['negative_count'] = diff_mw.apply(count_negatives, axis=1)
+
+diff_mw.sort_values(by =["negative_count"],inplace = True, ascending=False)
+
+
+html_table = diff_mw.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+# show(diff)
+```
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res2_valid = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res2_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res2_test = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res2_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+:::
+
+</br>
+
+
+Summary using radar plot
+
+```{python}
+#| layout-ncol: 2
+
+res1_valid['id'] = res1_valid.index.to_series().apply(extract_number)
+res1_test['id'] = res1_test.index.to_series().apply(extract_number)
+
+
+
+res_comb = pd.concat([res1_valid,res1_test])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res1_test = res1_test.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range1 = np.array(list(res1_valid['mean']) + list(res1_test['mean']))
+
+categories = [str(i) for i in range(1,26)]
+
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res1_test['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res1_valid['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "T-Test",
+        'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range1.min()), round(data_range1.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+
+
+
+##############
+
+
+res2_valid['id'] = res2_valid.index.to_series().apply(extract_number)
+res2_test['id'] = res2_test.index.to_series().apply(extract_number)
+
+
+res_comb = pd.concat([res2_valid,res2_test])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res2_test = res2_test.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+data_range2 = np.array(list(res2_valid['mean']) + list(res2_test['mean']))
+
+categories = [str(i) for i in range(1,26)]
+fig = go.Figure()
+
+# Valid
+fig.add_trace(go.Scatterpolar(
+       r=list(res2_test['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Test'
+))
+
+# Test
+fig.add_trace(go.Scatterpolar(
+      r=list(res2_valid['mean']),
+      theta=categories,
+      #fill='toself',
+      name='Valid'
+))
+
+# Customization of chart
+fig.update_layout(
+  title={
+      'text': "MU-Test",
+         'xanchor': 'center',
+      'yanchor': 'top'
+  },
+  polar=dict(
+    radialaxis=dict(
+      visible=True,
+      range=[round(data_range2.min()), round(data_range2.max()) + 1]
+    )),
+  showlegend=True
+)
+
+fig.show()
+
+best_valid_bit_size_8 = round(res1_valid['mean'][0])
+id_best_valid = res1_valid['id'][0]
+best_test_bit_size_8 = list(round(res1_test.query('id == @id_best_valid')['mean'],2))[0]
+
+best_valid_bit_size_8_mw = round(res2_valid['mean'][0])
+id_best_valid = res2_valid['id'][0]
+best_test_bit_size_8_mw = list(round(res2_test.query('id == @id_best_valid')['mean'],2))[0]
+
+```
+
+</br>
+
+</br>
+
+</br>
+
+
+
+:::
+
+
+:::
+
+
+
+:::
+
+Comparisons of bit size results
+
+```{python}
+#| layout-ncol: 2
+#| column: screen
+#| echo: false
+#| code-fold: false
+
+# data = {'bit_size':[8,16,32,48],
+#         'Valid': [best_valid_bit_size_8,best_valid_bit_size_16,best_valid_bit_size_32,best_valid_bit_size_48],
+#         'Test': [best_test_bit_size_8, best_test_bit_size_16, best_test_bit_size_32,best_test_bit_size_48]
+#         }
+# final_results = pd.DataFrame(data)
+
+
+# # Melt the dataframe to long format
+# df_melted = pd.melt(final_results, id_vars=['bit_size'], var_name='Metric', value_name='mAP')
+
+# # Create the bar plot
+# plt.figure(figsize=(12, 6))
+# sns.barplot(x='bit_size', y='mAP', hue='Metric', data=df_melted)
+
+# # Customize the plot
+# plt.title('T-Test')
+# plt.xlabel('Bit Size')
+# plt.ylabel('mAP')
+
+# # Add labels on top of each bar
+# for i in plt.gca().containers:
+#     plt.gca().bar_label(i, fmt='%.2f', label_type='edge')
+
+# # Adjust legend and layout
+# plt.legend(title='Metric', bbox_to_anchor=(1.05, 1))#, loc='upper left')
+# plt.tight_layout()
+
+# # Show the plot
+# plt.show()
+
+# data = {'bit_size':[8,16,32,48],
+#         'Valid': [best_valid_bit_size_8_mw, best_valid_bit_size_16_mw, best_valid_bit_size_32_mw, best_valid_bit_size_48_mw],
+#         'Test': [best_test_bit_size_8_mw, best_test_bit_size_16_mw, best_test_bit_size_32_mw, best_test_bit_size_48_mw]
+#         }
+# final_results_mw = pd.DataFrame(data)
+
+# # Melt the dataframe to long format
+# df_melted = pd.melt(final_results_mw, id_vars=['bit_size'], var_name='Metric', value_name='mAP')
+
+# # Create the bar plot
+# plt.figure(figsize=(12, 6))
+# sns.barplot(x='bit_size', y='mAP', hue='Metric', data=df_melted)
+
+# # Customize the plot
+# plt.title('MU-Test')
+# plt.xlabel('Bit Size')
+# plt.ylabel('mAP')
+
+# # Add labels on top of each bar
+# for i in plt.gca().containers:
+#     plt.gca().bar_label(i, fmt='%.2f', label_type='edge')
+
+# # Adjust legend and layout
+# plt.legend(title='Metric', bbox_to_anchor=(1.05, 1))
+# plt.tight_layout()
+
+# # Show the plot
+# plt.show()
+```
+::: {.column-screen layout-ncol=2}
+
+![T-test curves](Compiled_results_Ttest.png)
+
+![MU-test curves](Compiled_results.png)
+
+:::
+

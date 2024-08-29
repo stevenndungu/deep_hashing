@@ -1,0 +1,560 @@
+---
+title: "Image Retrieval"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: false
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: true
+    highlighting-style: GitHub
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Model Evaluation COSFIRE Filters Approach</h2>
+:::
+
+</br>
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+###################################################
+
+###################################################
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+import os
+os.environ['PYTHONHASHSEED'] = 'python'
+from scipy import stats
+
+from IPython.display import display, Markdown, HTML
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=True)
+from itables import show
+
+import torch.nn as nn
+
+import plotly.express as px
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.io as pio
+pio.renderers.default = "notebook"
+
+import pandas as pd
+import numpy as np
+import re
+from scipy import stats
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+
+
+
+```
+
+
+
+##  Final results - bit size 32
+
+
+::: {.panel-tabset}
+
+#### Test results
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+#%%
+
+dat = pd.read_csv("overall_noise_results/merged_test_runs_wide_format_abs_29072024_v3_layers_upd.csv")
+
+html_table = dat.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+```
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+test_columns_abs = [col for col in dat.columns if re.match(r'mAP_test_abs_values(?:_\d+)?$', col)]
+dat = dat[test_columns_abs]
+
+res = dat.describe().iloc[1:3]
+
+res = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+average_f0 = res['mean'].mean()
+print('The average is: ', average_f0)
+
+```
+#### Test results f05
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dat_f05 = pd.read_csv("overall_noise_results/f05/merged_test_runs_wide_format_abs_03082024_v3_layers_f05.csv")
+
+html_table = dat_f05.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+Average & Std Deviation of the Significant rows:
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+test_columns_abs_f1 = [col for col in dat_f05.columns if re.match(r'mAP_test_abs_values_f05(?:_\d+)?$', col)]
+dat_f05 = dat_f05[test_columns_abs_f1]
+
+res_f05 = dat_f05.describe().iloc[1:3]
+
+res_f05 = res_f05.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_f05.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+average_f05 = res_f05['mean'].mean()
+print('The average is: ', np.round(average_f05,2))
+
+df05 = pd.read_csv("overall_noise_results/dgnoise_test_accuracies/dgnoise_accuracies_f05_test.csv")
+
+print('The average of test data classification is: ', np.round(np.array(df05.acc_valid).mean(),2))
+
+
+```
+</br>
+
+
+#### Test results f1
+
+```{python}
+#| echo: false
+#| code-fold: false
+#|
+
+dat_f1 = pd.read_csv("overall_noise_results/f1/merged_validation_runs_all_31072024_v3_layers_f1.csv")
+
+html_table = dat_f1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+Average & Std Deviation of the Significant rows:
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+test_columns_abs_f1 = [col for col in dat_f1.columns if re.match(r'mAP_test_abs_values_f1(?:_\d+)?$', col)]
+dat_f1 = dat_f1[test_columns_abs_f1]
+
+res_f1 = dat_f1.describe().iloc[1:3]
+
+res_f1 = res_f1.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_f1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+average_f1 = res_f1['mean'].mean()
+print('The average is: ', np.round(average_f1,2))
+
+df1 = pd.read_csv("overall_noise_results/dgnoise_test_accuracies/dgnoise_accuracies_f1_test.csv")
+
+print('The average of test data classification is: ', np.round(np.array(df1.acc_valid).mean(),2))
+
+```
+</br>
+
+#### Test results f3
+
+```{python}
+#| echo: false
+#| code-fold: false
+dat_f3 = pd.read_csv("overall_noise_results/f3/merged_validation_runs_all_31072024_v3_layers_f3.csv")
+
+html_table = dat_f3.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+test_columns_abs_f3 = [col for col in dat_f3.columns if re.match(r'mAP_test_abs_values_f3(?:_\d+)?$', col)]
+dat_f3 = dat_f3[test_columns_abs_f3]
+
+res_f3 = dat_f3.describe().iloc[1:3]
+
+res_f3 = res_f3.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_f3.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+average_f3 = res_f3['mean'].mean()
+print('The average is: ', np.round(average_f3,2))
+
+df3 = pd.read_csv("overall_noise_results/dgnoise_test_accuracies/dgnoise_accuracies_f3_test.csv")
+
+print('The average of test data classification is: ', np.round(np.array(df3.acc_valid).mean(),2))
+
+
+
+```
+</br>
+
+#### Test results f5
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dat_f5 = pd.read_csv("overall_noise_results/f5/merged_validation_runs_all_31072024_v3_layers_f5.csv")
+
+html_table = dat_f5.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+test_columns_abs_f5 = [col for col in dat_f5.columns if re.match(r'mAP_test_abs_values_f5(?:_\d+)?$', col)]
+dat_f5 = dat_f5[test_columns_abs_f5]
+
+res_f5 = dat_f5.describe().iloc[1:3]
+
+res_f5 = res_f5.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_f5.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+average_f5 = res_f5['mean'].mean()
+print('The average is: ', average_f5)
+print('The average is: ', np.round(average_f5,2))
+
+df5 = pd.read_csv("overall_noise_results/dgnoise_test_accuracies/dgnoise_accuracies_f5_test.csv")
+
+print('The average of test data classification is: ', np.round(np.array(df5.acc_valid).mean(),2))
+```
+
+#### Test results DenseNet
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dat_dnt = pd.read_csv("overall_noise_results/final_results_dnt_04082024.csv")
+dat_dnt = dat_dnt.T
+dat_dnt = dat_dnt.reset_index()
+dat_dnt.columns = ['Type', 'DenseNet']
+
+dat_dnt.query('Type != "optimal threshold"', inplace=True)
+dat_dnt.query('Type != "Best Validation mAP"', inplace=True)
+
+html_table = dat_dnt.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+```
+
+
+COSFIRE
+
+```{python}
+
+data = {'Test mAP': [average_f0],
+        'Test mAP f05': [average_f05],
+        'Test mAP f1': [average_f1],
+        'Test mAP f3': [average_f3],
+        'Test mAP f5': [average_f5]
+        }
+
+df_results = pd.DataFrame(data)
+
+df_results = df_results.T
+df_results = df_results.reset_index()
+df_results.columns = ['Type', 'COSFIRE']
+
+
+
+html_table = df_results.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+```
+:::
+:::
+
+
+Comparison
+
+![](cosfire_densenet_comparison.png)
+
+```{python}
+
+df=pd.merge(df_results, dat_dnt, on='Type')
+df.columns = ['rms', 'COSFIRE', 'DenseNet']
+df['Cosfire_test_accuracy'] = [92,np.round(np.array(df05.acc_valid).mean(),2),
+ np.round(np.array(df1.acc_valid).mean(),2),
+ np.round(np.array(df3.acc_valid).mean(),2),
+ np.round(np.array(df5.acc_valid).mean(),2)]
+
+html_table = df.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+# # Data
+# types = [0.028, 0.043, 0.068, 0.168, 0.211]
+# cosfire = list(df.COSFIRE)
+# densenet = list(df.DenseNet)
+
+# # types = ['Test mAP', 'Test mAP f1', 'Test mAP f3', 'Test mAP f5']
+# # cosfire = [91.77261538461538, 32.512496, 29.886367999999997, 30.038784]
+# # densenet = [89.6, 68.56, 55.05, 43.89]
+# # Create the plot
+# SMALL_SIZE = 7
+# MEDIUM_SIZE = 7
+# BIGGER_SIZE = 7
+
+# plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+# plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+# plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+# plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+# #plt.rc('figure', titlesize=BIGGER_SIZE)
+
+# fig, ax = plt.subplots(figsize=(10/3, 3))
+# plt.plot(types, cosfire, marker='o', label='COSFIRE')
+# plt.plot(types, densenet, marker='s', label='DenseNet')
+
+# # Customize the plot
+# #plt.title('COSFIRE vs DenseNet Performance Comparison')
+# plt.xlabel('rms')
+# plt.ylabel('mAP')
+# plt.legend()
+
+# # Rotate x-axis labels for better readability
+# plt.xticks(rotation=0, ha='right')
+
+# # Add grid for better readability
+# #plt.grid(True, linestyle='--', alpha=0.7)
+# plt.rc('font', family='Nimbus Roman')
+
+# # Adjust layout to prevent cutting off labels
+# plt.tight_layout()
+
+# Add value labels on the points
+# for i, (c, d) in enumerate(zip(cosfire, densenet)):
+#     plt.text(i, c, f'{c:.2f}', ha='left', va='bottom')
+#     plt.text(i, d, f'{d:.2f}', ha='right', va='top')
+#plt.savefig('overall_noise_results/cosfire_densenet_comparison.png')
+#plt.savefig('overall_noise_results/flops_plot.svg',format='svg', dpi=1200)
+# Show the plot
+#plt.show()
+
+# import plotly.graph_objects as go
+
+
+
+# fig = go.Figure()
+
+# # Add traces for COSFIRE and DenseNet
+# fig.add_trace(go.Scatter(x=types, y=cosfire, mode='lines+markers+text', name='COSFIRE'))
+#                          #line=dict(color='blue'), marker=dict(symbol='circle'),
+#                          #text=[f'{y:.2f}' for y in cosfire], textposition='top right'))
+
+# fig.add_trace(go.Scatter(x=types, y=densenet, mode='lines+markers+text', name='DenseNet'))
+#                          #line=dict(color='red'), marker=dict(symbol='square'),
+#                         # text=[f'{y:.2f}' for y in densenet], textposition='top right'))
+
+# # Customize the layout
+# fig.update_layout(
+#     xaxis_title='rms',
+#     yaxis_title='mAP',
+#     #legend=dict(x=0.02, y=0.98),
+#     xaxis=dict(tickangle=0),
+#     yaxis=dict(gridcolor='lightgray', gridwidth=0.5),
+#     plot_bgcolor='white'
+# )
+
+# # Show the plot
+# fig.show()
+
+# # To save the plot as an interactive HTML file
+# fig.write_html("cosfire_densenet_comparison.html")
+
+# # To save the plot as a static image file
+# fig.write_image("cosfire_densenet_comparison.png")
+#
+```
+
+
+

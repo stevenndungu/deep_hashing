@@ -1,0 +1,253 @@
+---
+title: "Image Retrieval"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: true
+    highlighting-style: github
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Model(s) Evaluation</h2>
+:::
+
+</br>
+
+### Model Validation
+
+
+::: {.callout-tip}
+
+
+:::
+
+::: {.panel-tabset}
+
+###  Experiment 1 Results
+
+```{python}
+
+###################################################
+# Experiment 1
+###################################################
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+from scipy import stats
+
+from IPython.display import display, Markdown, HTML
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=True)
+from itables import show
+
+import pandas as pd
+import numpy as np
+
+from scipy import stats
+def find_max(row):
+    return row.max()
+#%%
+dt_valid  = pd.read_csv("I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\merged_validation_runs_wide_format.csv")
+
+dt_test  = pd.read_csv("I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\merged_test_runs_wide_format.csv")
+
+
+
+```
+
+Validation Data mAP Results Preview:
+
+```{python}
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+Test Data mAP Results Preview:
+
+```{python}
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+::: {.panel-tabset}
+
+#### Model performance on Validation data
+
+
+```{python}
+
+#show(dt_test)
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+dt_valid_sub['max_map'] = dt_valid_sub.apply(find_max, axis=1)
+
+dt_valid_sub['max_map'] = dt_valid_sub.apply(find_max, axis=1)
+dt_valid_sub.sort_values(by='max_map', ascending=False, inplace=True)
+
+#maximum Value
+dt_valid_sub['max_map'].max()
+#########
+
+
+# extract max value row.
+max_index = dt_valid_sub['max_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+#or
+dt_valid_sub.head(1)
+
+```
+
+Statstical Significance:
+
+```{python}
+
+pvalues = []
+
+for _,index in enumerate(dt_valid_sub.index):
+  _, p_value = stats.ttest_ind(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')
+  pvalues.append((p_value>=0.05)*1)
+  
+  
+dt_valid_sub['sig'] = pvalues
+dt_valid_sub1 = dt_valid_sub.query('sig == 1')
+
+
+max_indexx = dt_valid_sub1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+
+dt_valid_sub1.describe().iloc[1:3]
+```
+
+#show(dt_test)
+
+#### Model performance on Test data
+
+Use the hyperparameters to the test data.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub1.index].iloc[:, :6].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['max_map'] = test_data_1_sub.apply(find_max, axis=1)
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+```
+
+
+
+:::
+
+### Experiment 2 Results
+
+
+::: {.panel-tabset}
+
+
+
+#### Model performance 2
+
+```{python}
+
+```
+
+#### Model performance (paper) 2
+
+
+```{python}
+
+
+```
+
+:::
+
+```{python}
+
+###################################################
+# Experiment 2
+###################################################
+
+
+df_base_valid = pd.read_csv("I:/My Drive/deep_learning/deep_hashing/deep_hashing_github/COSFIRE_26_valid_hyperparameters_descriptors/model_selection_valid_and_13052024_model7_wide_format.csv")
+
+df_base_test= pd.read_csv("I:/My Drive/deep_learning/deep_hashing/deep_hashing_github/COSFIRE_26_valid_hyperparameters_descriptors/model_selection_test_and_13052024_model7_wide_format.csv")
+  
+```
+
+
+:::
+:::

@@ -1,0 +1,2294 @@
+---
+title: "MLP Classification"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: true
+    highlighting-style: github
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Model(s) Evaluation</h2>
+:::
+
+</br>
+
+### Classification on Different COSFIRE Descriptors
+
+
+::: {.callout-tip}
+
+Running a similar MLP hyperparameter set for the classification of various descriptor sets.
+
+:::
+
+## Descriptor Set 2
+
+::: {.panel-tabset}
+
+###  MLP with one linear layer
+
+```{python}
+
+###################################################
+# Experiment 1
+###################################################
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+# Import necessary libraries
+import torch
+import torch.nn as nn
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.io import loadmat
+from sklearn import preprocessing
+from sklearn.preprocessing import StandardScaler
+import random, os
+def reproducibility_requirements(seed=100):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    #print("Set seed of", str(seed),"is done for reproducibility")
+
+reproducibility_requirements()#For Reproducibility
+
+
+seed = 100
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.use_deterministic_algorithms(True)
+
+num = 2
+num_epochs = 400
+
+def get_data(path):
+      
+   # Load the MATLAB file
+   data = loadmat(path)
+   df0 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][0])
+   df0['label'] = 'FRI'
+   df1 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][1])
+   df1['label'] = 'FRII'
+   df2 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][2])
+   df2['label'] = 'Bent'
+   df3 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][3])
+   df3['label'] = 'Compact'
+   df_train = pd.concat([df0, df1, df2, df3], ignore_index=True)
+
+   df0 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][0])
+   df0['label'] = 'FRI'
+   df1 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][1])
+   df1['label'] = 'FRII'
+   df2 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][2])
+   df2['label'] = 'Bent'
+   df3 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][3])
+   df3['label'] = 'Compact'
+   df_test = pd.concat([df0, df1, df2, df3], ignore_index=True)
+
+
+   # Rename the columns:
+   column_names = ["descrip_" + str(i) for i in range(1, 401)] + ["label_code"]
+   df_train.columns = column_names
+   df_test.columns = column_names
+
+   #select the optimal number of columns from the classification paper.#Get the optimal 372 descriptors only
+   column_list = [f'descrip_{i}' for i in range(1, 373)] + ['label_code']
+   df_train = df_train[column_list]
+   df_test = df_test[column_list]
+
+   dic_labels = { 'Bent':2,
+                  'Compact':3,
+                     'FRI':0,
+                     'FRII':1
+               }
+
+
+   df_train['label_code'] = df_train['label_code'].map(dic_labels)
+   df_test['label_code'] = df_test['label_code'].map(dic_labels)
+
+
+   return df_train, df_test
+
+
+
+train_df, valid_test_df = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors_v2\descriptor_set_{num}_train_valid_test.mat")
+valid_df = valid_test_df.loc[0:397,]
+test_df = valid_test_df.loc[398:,]
+
+
+X_train = preprocessing.normalize(train_df.iloc[:, :-1].values)
+#X_train = df_training.iloc[:, :-1].values
+#scaler = StandardScaler().fit(X_train)
+#X_train = scaler.transform(X_train)
+X_train = torch.FloatTensor(X_train)
+y_train = train_df.iloc[:, -1].values
+y_train = torch.LongTensor(y_train)
+
+X_valid = preprocessing.normalize(valid_df.iloc[:, :-1].values)
+#X_valid = valid_df.iloc[:, :-1].values
+#X_valid = scaler.transform(X_valid)
+X_valid = torch.FloatTensor(X_valid)
+y_valid = valid_df.iloc[:, -1].values
+y_valid = torch.LongTensor(y_valid)
+
+X_test = preprocessing.normalize(test_df.iloc[:, :-1].values)
+#X_test = df_testing.iloc[:, :-1].values
+#X_test = scaler.transform(X_test)
+X_test = torch.FloatTensor(X_test)
+y_test = test_df.iloc[:, -1].values
+y_test = torch.LongTensor(y_test)
+
+
+
+# print('Train: ',train_df.shape)
+
+# print('Valid: ',valid_df.shape)
+
+# print('Test: ',test_df.shape)
+
+
+
+
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, output_dim)           
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+
+
+```
+
+
+###   MLP with two linear layer
+
+```{python}
+
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300),             
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, output_dim)          
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+
+```
+
+###   MLP with three linear layer
+
+```{python}
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, output_dim),
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+
+###  MLP with four linear layer
+
+```{python}
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, 100),
+            nn.BatchNorm1d(100), 
+            nn.Tanh(),
+            nn.Linear(100, output_dim), 
+                     
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+
+###  MLP with five linear layer
+
+```{python}
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, 100),
+            nn.BatchNorm1d(100), 
+            nn.Tanh(),
+            nn.Linear(100, 64), 
+            nn.BatchNorm1d(64), 
+            nn.Tanh(),
+            nn.Linear(64, output_dim), 
+                     
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+::: 
+
+## Descriptor Set 13
+
+::: {.panel-tabset}
+
+###  MLP with one linear layer
+
+```{python}
+
+num = 13
+
+
+train_df, valid_test_df = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors_v2\descriptor_set_{num}_train_valid_test.mat")
+valid_df = valid_test_df.loc[0:397,]
+test_df = valid_test_df.loc[398:,]
+
+
+X_train = preprocessing.normalize(train_df.iloc[:, :-1].values)
+#X_train = df_training.iloc[:, :-1].values
+#scaler = StandardScaler().fit(X_train)
+#X_train = scaler.transform(X_train)
+X_train = torch.FloatTensor(X_train)
+y_train = train_df.iloc[:, -1].values
+y_train = torch.LongTensor(y_train)
+
+X_valid = preprocessing.normalize(valid_df.iloc[:, :-1].values)
+#X_valid = valid_df.iloc[:, :-1].values
+#X_valid = scaler.transform(X_valid)
+X_valid = torch.FloatTensor(X_valid)
+y_valid = valid_df.iloc[:, -1].values
+y_valid = torch.LongTensor(y_valid)
+
+X_test = preprocessing.normalize(test_df.iloc[:, :-1].values)
+#X_test = df_testing.iloc[:, :-1].values
+#X_test = scaler.transform(X_test)
+X_test = torch.FloatTensor(X_test)
+y_test = test_df.iloc[:, -1].values
+y_test = torch.LongTensor(y_test)
+
+
+
+# print('Train: ',train_df.shape)
+
+# print('Valid: ',valid_df.shape)
+
+# print('Test: ',test_df.shape)
+
+
+
+
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, output_dim)           
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+
+
+```
+
+
+###   MLP with two linear layer
+
+```{python}
+
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300),             
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, output_dim)          
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+
+```
+
+###   MLP with three linear layer
+
+```{python}
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, output_dim),
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+
+###  MLP with four linear layer
+
+```{python}
+
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, 100),
+            nn.BatchNorm1d(100), 
+            nn.Tanh(),
+            nn.Linear(100, output_dim), 
+                     
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+num_epochs = 350
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+
+###  MLP with five linear layer
+
+```{python}
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, 100),
+            nn.BatchNorm1d(100), 
+            nn.Tanh(),
+            nn.Linear(100, 64), 
+            nn.BatchNorm1d(64), 
+            nn.Tanh(),
+            nn.Linear(64, output_dim), 
+                     
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+:::
+
+## Descriptor Set 22
+
+::: {.panel-tabset}
+
+###  MLP with one linear layer
+
+```{python}
+
+num = 22
+
+
+train_df, valid_test_df = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors_v2\descriptor_set_{num}_train_valid_test.mat")
+valid_df = valid_test_df.loc[0:397,]
+test_df = valid_test_df.loc[398:,]
+
+
+X_train = preprocessing.normalize(train_df.iloc[:, :-1].values)
+#X_train = df_training.iloc[:, :-1].values
+#scaler = StandardScaler().fit(X_train)
+#X_train = scaler.transform(X_train)
+X_train = torch.FloatTensor(X_train)
+y_train = train_df.iloc[:, -1].values
+y_train = torch.LongTensor(y_train)
+
+X_valid = preprocessing.normalize(valid_df.iloc[:, :-1].values)
+#X_valid = valid_df.iloc[:, :-1].values
+#X_valid = scaler.transform(X_valid)
+X_valid = torch.FloatTensor(X_valid)
+y_valid = valid_df.iloc[:, -1].values
+y_valid = torch.LongTensor(y_valid)
+
+X_test = preprocessing.normalize(test_df.iloc[:, :-1].values)
+#X_test = df_testing.iloc[:, :-1].values
+#X_test = scaler.transform(X_test)
+X_test = torch.FloatTensor(X_test)
+y_test = test_df.iloc[:, -1].values
+y_test = torch.LongTensor(y_test)
+
+
+
+# print('Train: ',train_df.shape)
+
+# print('Valid: ',valid_df.shape)
+
+# print('Test: ',test_df.shape)
+
+
+
+
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, output_dim)           
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+
+
+```
+
+
+###   MLP with two linear layer
+
+```{python}
+
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300),             
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, output_dim)          
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+
+```
+
+###   MLP with three linear layer
+
+```{python}
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, output_dim),
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+num_epochs = 350
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+
+###  MLP with four linear layer
+
+```{python}
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, 100),
+            nn.BatchNorm1d(100), 
+            nn.Tanh(),
+            nn.Linear(100, output_dim), 
+                     
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+
+###  MLP with five linear layer
+
+```{python}
+class MLP_Classifier(nn.Module):
+   def __init__(self, input_dim, output_dim,l1_reg):
+      super(MLP_Classifier, self).__init__()
+      self.l1_reg = l1_reg
+      self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 300), 
+            nn.BatchNorm1d(300),
+            nn.Tanh(),
+            nn.Linear(300, 200), 
+            nn.BatchNorm1d(200),
+            nn.Tanh(),
+            nn.Linear(200, 100),
+            nn.BatchNorm1d(100), 
+            nn.Tanh(),
+            nn.Linear(100, 64), 
+            nn.BatchNorm1d(64), 
+            nn.Tanh(),
+            nn.Linear(64, output_dim), 
+                     
+            
+      )
+
+   def forward(self, x):
+      regularization_loss = 0.0
+      for param in self.mlp.parameters():
+         regularization_loss += torch.sum(torch.abs(param)) * self.l1_reg  # L1 regularization
+      return self.mlp(x), regularization_loss
+   
+
+input_dim  = 372
+output_dim = 4
+l1_reg = 1e-9
+model = MLP_Classifier(input_dim,output_dim,l1_reg)
+
+# creating our optimizer and loss function object
+learning_rate = 0.1
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate)
+
+
+
+def train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test):
+   for epoch in range(num_epochs):
+      model.train()
+      #clear out the gradients from the last step loss.backward()
+      optimizer.zero_grad()
+      
+      #forward feed
+      output_train, reg_loss = model(X_train)
+
+      #calculate the loss
+      loss_train = criterion(output_train, y_train) + reg_loss
+           
+      #backward propagation: calculate gradients
+      loss_train.backward()
+
+      #update the weights
+      optimizer.step()
+
+
+      model.eval()
+
+      
+      output_valid, regloss = model(X_valid)
+      loss_valid = criterion(output_valid,y_valid) + regloss
+
+      output_test, reg_loss = model(X_test)
+      loss_test = criterion(output_test,y_test) + reg_loss
+
+      
+      train_losses[epoch] = loss_train.item()
+      valid_losses[epoch] = loss_valid.item()
+      test_losses[epoch] = loss_test.item()
+
+      train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()*100
+
+      valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()*100
+
+      test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()*100
+
+     
+      accuracy_train[epoch] = train_acc
+      accuray_valid[epoch] = valid_acc
+      accuracy_test[epoch] = test_acc
+
+      
+
+      # if (epoch + 1) % 100 == 0:
+      #       print(f"Epoch {epoch+1}/{num_epochs}, Train Loss: {loss_train.item():.4f}, Valid Loss: {loss_valid.item():.4f}")
+
+
+
+
+train_losses = np.zeros(num_epochs)
+valid_losses  = np.zeros(num_epochs)
+test_losses = np.zeros(num_epochs)
+
+
+accuracy_train = np.zeros(num_epochs)
+accuray_valid  = np.zeros(num_epochs)
+accuracy_test = np.zeros(num_epochs)
+
+
+train_network(model,optimizer,criterion,X_train,y_train,X_valid,y_valid,num_epochs,train_losses,valid_losses,test_losses,accuracy_train,accuray_valid,accuracy_test)
+
+train_acc = (sum(nn.Softmax(dim=1)(model(X_train)[0]).argmax(dim=1) == y_train)/y_train.size(0)).item()
+
+valid_acc = (sum(nn.Softmax(dim=1)(model(X_valid)[0]).argmax(dim=1) == y_valid)/y_valid.size(0)).item()
+
+test_acc = (sum(nn.Softmax(dim=1)(model(X_test)[0]).argmax(dim=1) == y_test)/y_test.size(0)).item()
+
+
+print(f"Training Accuracy: {round(train_acc*100,3)}")
+print(f"Valid Accuracy: {round(valid_acc*100,3)}")
+print(f"Test Accuracy: {round(test_acc*100,3)}")
+
+plt.figure(figsize=(10,10))
+plt.plot(train_losses, label='Train loss')
+plt.plot(valid_losses, label='Valid loss')
+plt.plot(test_losses, label='Test loss')
+plt.legend()
+plt.show()
+plt.close()
+
+plt.figure(figsize=(10,10))
+plt.plot(accuracy_train, label='Train accuracy')
+plt.plot(accuray_valid, label='Valid accuracy')
+plt.plot(accuracy_test, label='Test accuracy')
+plt.legend()
+plt.show()
+plt.close()
+
+
+
+```
+:::
+:::
