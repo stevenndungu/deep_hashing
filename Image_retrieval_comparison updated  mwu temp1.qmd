@@ -1,0 +1,464 @@
+---
+title: "Image Retrieval"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: false
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: true
+    highlighting-style: GitHub
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Model Evaluation COSFIRE Filters Approach</h2>
+:::
+
+</br>
+
+# Introduction
+
+We obtain the 26 statistically significant sets of hyperparameters from the classification paper along with their respective training, validation, and test descriptors. Based on these descriptors, we perform image hashing for each set of descriptors using a selected set of MLP hyperparameters (for the grid search). 
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+###################################################
+
+###################################################
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+import os
+os.environ['PYTHONHASHSEED'] = 'python'
+from scipy import stats
+
+from IPython.display import display, Markdown, HTML
+from itables import init_notebook_mode
+init_notebook_mode(all_interactive=True)
+from itables import show
+
+import torch.nn as nn
+
+import plotly.express as px
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.io as pio
+pio.renderers.default = "notebook"
+
+import pandas as pd
+import numpy as np
+import re
+from scipy import stats
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+def find_max(row):
+    return row.max()
+
+
+def colsum(x):
+    return sum(np.isnan(x))
+
+
+# l1_reg_values = [0,0.0001, 0.00001, 1e-8]
+# l2_reg_values = [0,0.0001, 0.00001, 1e-8]
+
+
+
+```
+
+
+
+::: {.panel-tabset}
+
+##  Bit size 72
+
+::: {.panel-tabset}
+
+#### Validation Data mAP Results Preview:
+
+```{python}
+
+#%%
+
+layer_vsn = 'v3_layers_64_72'
+
+dt_valid  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers/merged_validation_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+dt_test  = pd.read_csv(f"descriptors_tain_valid_test/v3_layers/merged_test_runs_wide_format_abs_13062024_{layer_vsn}.csv")
+
+
+
+output_size = 72
+
+query = (
+    "output_size == @output_size "
+)
+
+dt_valid = dt_valid.query(query)
+
+dt_test = dt_test.query(query)
+
+```
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_valid.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+</br>
+
+#### Test Data mAP Results Preview:
+
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+#| 
+html_table = dt_test.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+:::
+
+</br>
+
+The global mean maximum row:
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+################
+dt_valid_sub = dt_valid[list(dt_valid.columns[dt_valid.columns.str.startswith('mAP_valid')])]
+
+# Apply the function row-wise
+dt_valid_sub['average_map'] = dt_valid_sub.apply(np.mean, axis=1)
+dt_valid_sub.sort_values(by='average_map', ascending=False, inplace=True)
+
+#maximum mean value
+dt_valid_sub['average_map'].max()
+
+
+
+#########
+
+
+# extract max value row.
+
+max_index = dt_valid_sub['average_map'].idxmax()
+max_row = dt_valid_sub.loc[max_index]
+#print(max_row)
+dt_valid_sub_mw = dt_valid_sub.copy()
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+dd = dt_valid_sub.head(10)
+
+html_table = dd.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+
+
+
+
+#### Model performance on validation data (Mann-Whitney U Test)
+
+##### Statistical Significance:
+
+
+Using the global mean maximum row as the reference, we perform the right-tailed t-test to identify significant hyperparameters.
+
+```{python}
+
+pvalues_mw = []
+pvalues_real_mw = []
+
+for _,index in enumerate(dt_valid_sub.index):
+
+  _, p_value_mw = stats.mannwhitneyu(max_row[:-1], dt_valid_sub.loc[index][:-1], alternative='greater')#, method = 'asymptotic')
+  pvalues_real_mw.append(p_value_mw)
+  pvalues_mw.append((p_value_mw >= 0.05)*1)
+  
+
+dt_valid_sub_mw['pvalues_mw'] = pvalues_real_mw
+dt_valid_sub_mw['sig_mw'] = pvalues_mw
+
+dt_valid_sub_mw1 = dt_valid_sub_mw.query('sig_mw == 1')
+
+
+max_indexx = dt_valid_sub_mw1.iloc[:, :-3].mean().idxmax()
+
+#print(sum(pvalues),max_indexx)
+```
+
+
+```{python}
+#| echo: false
+#| code-fold: false
+
+dt_mw = dt_valid.loc[dt_valid_sub_mw1.index].sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = dt_mw.to_html(index=True)
+
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+print('Size of the All data: ',dt_valid_sub_mw.shape)
+
+print('Size of the Sig data: ',dt_mw.shape)
+
+```
+
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params_mw1 = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']]
+optimal_params_mw = optimal_params_mw1.reset_index()
+optimal_params_mw.drop(['index'], axis=1, inplace = True)
+
+#rotation invariance test data with optimal parameters
+test_data_mw1 = pd.merge(optimal_params_mw, dt_test, on=['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+test_data_1_sub_mw = test_data_mw1[list(test_data_mw1.columns[test_data_mw1.columns.str.startswith('mAP_test')])]
+```
+
+Equivalent test data
+
+```{python}
+#| echo: false
+#| code-fold: false
+test_data_mw1 = test_data_mw1.sort_values(by = ['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg'])
+html_table = test_data_mw1.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+print('Size of the test data: ',test_data_mw1.shape)
+```
+
+
+
+::: {.panel-tabset}
+
+##### Model performance on valid data 
+
+Average & Std Deviation of the Significant rows:
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = dt_valid_sub_mw1.iloc[:,:-3].describe().iloc[1:3]
+
+res_valid_mwu_72 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_valid_mwu_72.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+
+```
+
+
+##### Model performance on Test data 
+</br>
+We then apply the hyperparameters to the test set and average the results.
+
+```{python}
+####################################################
+# Use the hyperparameters to the test data.
+####################################################
+optimal_params = dt_valid.loc[dt_valid_sub_mw1.index][['input_size', 'output_size', 'learning_rate', 'batch_size', 'alpha', 'margin', 'l1_reg', 'l2_reg']].reset_index()
+optimal_params.drop(['index'], axis=1, inplace = True)
+
+optimal_params.to_csv('optimal_params_72bit.csv',index=False)
+#rotation invariance test data with optimal parameters
+test_data_1 = pd.merge(optimal_params, dt_test, how='left')
+test_data_1_sub = test_data_1[list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')])]
+test_data_1['average_map'] = test_data_1_sub.apply(np.mean, axis=1)
+
+test_data_1.sort_values(by=['average_map'], ascending= False,inplace=True)
+
+```
+
+```{python}
+#| echo: false
+#| code-fold: false
+res = test_data_1.describe().iloc[1:3][list(test_data_1.columns[test_data_1.columns.str.startswith('mAP_test')]) + ['average_map']]
+
+res_test_mwu_72 = res.T.sort_values(by=['mean'], ascending= False)
+
+html_table = res_test_mwu_72.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 400px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+
+```
+:::
+
+```{python}
+def extract_number(text):
+    if isinstance(text, str):
+        matches = re.findall(r'\d+', text)
+        return int(matches[0]) if matches else 1
+    return 1
+
+res_valid_mwu_72['id'] = res_valid_mwu_72.index.to_series().apply(extract_number)
+res_test_mwu_72['id'] = res_test_mwu_72.index.to_series().apply(extract_number)
+
+res_comb = pd.concat([res_valid_mwu_72,res_test_mwu_72])
+index_series = res_comb.index.to_series()
+
+res_comb['type'] = np.where(
+    index_series.str.contains('valid', case=False), 'valid',
+    np.where(index_series.str.contains('test', case=False), 'test', 'unknown')
+)
+res_comb = res_comb.query("type !='unknown'")
+
+res_comb =  res_comb.reset_index(drop=True)
+
+
+res_test_mwu_72 = res_test_mwu_72.sort_values(by=['id']).reset_index().query("index !='average_map'")
+
+
+res_valid_mwu_72 =  res_valid_mwu_72.reset_index(drop=True)
+res_valid_mwu_72.columns = ['valid_score', 'std', 'id']
+res_valid_mwu_72 = res_valid_mwu_72[['valid_score', 'id']]
+
+res_test_mwu_72.columns = ['label2', 'test_score', 'std', 'id']
+res_test_mwu_72 = res_test_mwu_72[['test_score', 'id']]
+
+
+result_merged_mwu_72 = pd.merge(res_valid_mwu_72,res_test_mwu_72,on='id')
+
+
+result_merged_mwu_72.sort_values(by=['valid_score'], ascending=False,inplace=True)
+
+result_merged_mwu_72 = result_merged_mwu_72[['id','valid_score','test_score']]
+
+html_table = result_merged_mwu_72.to_html(index=True)
+
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 500px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
+```
+
+
+```{python}
+```
+
+</br>
+
+
+
+:::
+:::
+

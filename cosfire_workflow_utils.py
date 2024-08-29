@@ -36,6 +36,7 @@ from torch.linalg import vector_norm
 from sklearn.manifold import TSNE
 from sklearn import preprocessing
 
+<<<<<<< HEAD
 # -*- coding: utf-8 -*-
 """
 Created on Thu Mar 23 10:25:28 2023
@@ -90,6 +91,8 @@ dic_labels_rev = { 2:'Bent',
                   0:'FRI',
                   1: 'FRII'
               }
+=======
+>>>>>>> 47bb432d0e6c34fdab3a40c5af9c5d3eeec391c7
 
 #For Reproducibility
 def reproducibility_requirements(seed=100):
@@ -202,6 +205,7 @@ def get_data(path, dic_labels):
    column_names = ["descrip_" + str(i) for i in range(1, 401)] + ["label_code"]
    df_train.columns = column_names
    df_test.columns = column_names
+<<<<<<< HEAD
 
    #select the optimal number of columns from the classification paper.#Get the optimal 372 descriptors only
    column_list = [f'descrip_{i}' for i in range(1, 373)] + ['label_code']
@@ -209,6 +213,21 @@ def get_data(path, dic_labels):
    df_test = df_test[column_list]
 
      
+=======
+
+   #select the optimal number of columns from the classification paper.#Get the optimal 372 descriptors only
+   column_list = [f'descrip_{i}' for i in range(1, 373)] + ['label_code']
+   df_train = df_train[column_list]
+   df_test = df_test[column_list]
+
+   dic_labels = { 'Bent':2,
+                  'Compact':3,
+                     'FRI':0,
+                     'FRII':1
+               }
+
+  
+>>>>>>> 47bb432d0e6c34fdab3a40c5af9c5d3eeec391c7
    df_train['label_code'] = df_train['label_code'].map(dic_labels)
    df_test['label_code'] = df_test['label_code'].map(dic_labels)
 

@@ -1,0 +1,522 @@
+---
+title: "MLP Classification"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: true
+    highlighting-style: github
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Model(s) Evaluation</h2>
+:::
+
+</br>
+
+### Classification on Different COSFIRE Descriptors
+
+
+::: {.callout-tip}
+
+Running a similar MLP hyperparameter set for the classification of various descriptor sets.
+
+:::
+
+::: {.panel-tabset}
+
+###  COSFIRE Descriptors Set 2
+
+```{python}
+
+###################################################
+# Experiment 1
+###################################################
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+# Import necessary libraries
+from sklearn.neural_network import MLPClassifier
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+
+import glob
+import os, random
+import torch
+import torch.nn as nn
+import pandas as pd
+from scipy.io import loadmat
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+os.environ['PYTHONHASHSEED'] = 'python'
+from IPython.display import Markdown, display
+from sklearn.preprocessing import label_binarize
+from sklearn.preprocessing import MinMaxScaler
+
+import torch
+import torch.optim as optim
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+from PIL import Image
+import torchvision.transforms as transforms
+
+from pytorch_metric_learning.distances import CosineSimilarity
+from pytorch_metric_learning.reducers import ThresholdReducer
+from pytorch_metric_learning.regularizers import LpRegularizer
+from pytorch_metric_learning import losses,  reducers
+from pytorch_metric_learning.distances import LpDistance
+
+import torch
+import torch.nn as nn
+
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn import preprocessing
+
+
+seed = 42
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.use_deterministic_algorithms(True)
+#%%
+
+def get_data(path):
+      
+   # Load the MATLAB file
+   data = loadmat(path)
+   df0 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][0])
+   df0['label'] = 'FRI'
+   df1 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][1])
+   df1['label'] = 'FRII'
+   df2 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][2])
+   df2['label'] = 'Bent'
+   df3 = pd.DataFrame(data['COSFIREdescriptor']['training'][0][0][0][0][3])
+   df3['label'] = 'Compact'
+   df_train = pd.concat([df0, df1, df2, df3], ignore_index=True)
+
+   df0 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][0])
+   df0['label'] = 'FRI'
+   df1 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][1])
+   df1['label'] = 'FRII'
+   df2 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][2])
+   df2['label'] = 'Bent'
+   df3 = pd.DataFrame(data['COSFIREdescriptor']['testing'][0][0][0][0][3])
+   df3['label'] = 'Compact'
+   df_test = pd.concat([df0, df1, df2, df3], ignore_index=True)
+
+
+   # Rename the columns:
+   column_names = ["descrip_" + str(i) for i in range(1, 401)] + ["label_code"]
+   df_train.columns = column_names
+   df_test.columns = column_names
+
+   #select the optimal number of columns from the classification paper.#Get the optimal 372 descriptors only
+   column_list = [f'descrip_{i}' for i in range(1, 373)] + ['label_code']
+   df_train = df_train[column_list]
+   df_test = df_test[column_list]
+
+   dic_labels = { 'Bent':2,
+                  'Compact':3,
+                     'FRI':0,
+                     'FRII':1
+               }
+
+
+   df_train['label_code'] = df_train['label_code'].map(dic_labels)
+   df_test['label_code'] = df_test['label_code'].map(dic_labels)
+
+
+   return df_train, df_test
+
+
+
+num = 2
+
+
+df_training, df_testing = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\descriptor_set_{num}_train_test.mat")
+X_train = preprocessing.normalize(df_training.iloc[:, :-1].values)
+y_train = df_training.iloc[:, -1].values
+
+X_test = preprocessing.normalize(df_testing.iloc[:, :-1].values)
+y_test = df_testing.iloc[:, -1].values
+
+_, valid_df = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\descriptor_set_{num}_train_valid.mat")
+
+X_valid = preprocessing.normalize(valid_df.iloc[:, :-1].values)
+y_valid = valid_df.iloc[:, -1].values
+
+
+
+# a Multilayer perceptrons (MLP) with only 1 hidden layer consists of 100 neuron, on the trainnig dataset
+mlp = MLPClassifier(hidden_layer_sizes=(300,200,100,64),
+                    #learning_rate = 'adaptive',
+                    learning_rate_init=0.001,
+                    activation='tanh', # {"tanh", "relu"}
+                    solver='sgd', # {"lbfgs", "sgd", "adam"}
+                    validation_fraction=0,
+					max_iter=150, random_state=42)
+
+
+# Train the model on the training data
+mlp.fit(X_train, y_train)
+
+# # Generate a classification report
+# class_report = classification_report(y_valid, y_pred)
+# print("Classification Report:\n", class_report)
+
+
+#Train the model and collect loss values
+train_loss = []
+val_loss = []
+for i in range(mlp.max_iter):
+    mlp.partial_fit(X_train, y_train, classes=np.unique(y_train))
+    train_loss.append(mlp.loss_)
+    #mlp.partial_fit(X_valid, y_valid, classes=np.unique(y_valid))
+   # val_loss.append(mlp.loss_)
+
+
+# Plot the training and validation loss curves
+plt.figure(figsize=(8, 6))
+plt.plot(train_loss, label='Training Loss')
+#plt.plot(val_loss, label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss Curves')
+plt.legend()
+plt.show()
+
+
+
+# Make predictions on the valid data
+y_pred = mlp.predict(X_valid)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_valid, y_pred)
+print(f"Validation Accuracy: {accuracy:.2f}")
+
+# Make predictions on the test data
+y_pred = mlp.predict(X_test)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Test Accuracy: {accuracy:.2f}")
+
+# Make predictions on the train data
+y_pred = mlp.predict(X_train)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_train, y_pred)
+print(f"Train Accuracy: {accuracy:.2f}")
+
+#%%
+
+
+```
+
+
+###  COSFIRE Descriptors Set 15
+
+```{python}
+
+
+
+
+
+num = 15
+
+
+
+df_training, df_testing = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\descriptor_set_{num}_train_test.mat")
+X_train = preprocessing.normalize(df_training.iloc[:, :-1].values)
+y_train = df_training.iloc[:, -1].values
+
+X_test = preprocessing.normalize(df_testing.iloc[:, :-1].values)
+y_test = df_testing.iloc[:, -1].values
+
+_, valid_df = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\descriptor_set_{num}_train_valid.mat")
+
+X_valid = preprocessing.normalize(valid_df.iloc[:, :-1].values)
+y_valid = valid_df.iloc[:, -1].values
+
+
+
+# a Multilayer perceptrons (MLP) with only 1 hidden layer consists of 100 neuron, on the trainnig dataset
+mlp = MLPClassifier(hidden_layer_sizes=(300,200,100,64),
+                    #learning_rate = 'adaptive',
+                    learning_rate_init=0.01,
+                    activation='tanh', # {"tanh", "relu"}
+                    solver='sgd', # {"lbfgs", "sgd", "adam"}
+					max_iter=800, random_state=42)
+
+
+# Train the model on the training data
+mlp.fit(X_train, y_train)
+
+# # Generate a classification report
+# class_report = classification_report(y_valid, y_pred)
+# print("Classification Report:\n", class_report)
+
+
+# Train the model and collect loss values
+train_loss = []
+val_loss = []
+for i in range(mlp.max_iter):
+    mlp.partial_fit(X_train, y_train, classes=np.unique(y_train))
+    train_loss.append(mlp.loss_)
+    mlp.partial_fit(X_valid, y_valid, classes=np.unique(y_train))
+    val_loss.append(mlp.loss_)
+
+
+# Plot the training and validation loss curves
+plt.figure(figsize=(8, 6))
+plt.plot(train_loss, label='Training Loss')
+plt.plot(val_loss, label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss Curves')
+plt.legend()
+plt.show()
+
+
+
+# Make predictions on the valid data
+y_pred = mlp.predict(X_valid)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_valid, y_pred)
+print(f"Validation Accuracy: {accuracy:.2f}")
+
+# Make predictions on the test data
+y_pred = mlp.predict(X_test)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Test Accuracy: {accuracy:.2f}")
+
+# Make predictions on the train data
+y_pred = mlp.predict(X_train)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_train, y_pred)
+print(f"Train Accuracy: {accuracy:.2f}")
+
+```
+
+###  COSFIRE Descriptors Set 22
+
+```{python}
+num = 22
+
+df_training, df_testing = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\descriptor_set_{num}_train_test.mat")
+X_train = preprocessing.normalize(df_training.iloc[:, :-1].values)
+y_train = df_training.iloc[:, -1].values
+
+X_test = preprocessing.normalize(df_testing.iloc[:, :-1].values)
+y_test = df_testing.iloc[:, -1].values
+
+_, valid_df = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\descriptor_set_{num}_train_valid.mat")
+
+X_valid = preprocessing.normalize(valid_df.iloc[:, :-1].values)
+y_valid = valid_df.iloc[:, -1].values
+
+
+
+# a Multilayer perceptrons (MLP) with only 1 hidden layer consists of 100 neuron, on the trainnig dataset
+mlp = MLPClassifier(hidden_layer_sizes=(300,200,100,64),
+                    #learning_rate = 'adaptive',
+                    learning_rate_init=0.01,
+                    activation='tanh', # {"tanh", "relu"}
+                    solver='sgd', # {"lbfgs", "sgd", "adam"}
+					max_iter=800, random_state=42)
+
+
+# Train the model on the training data
+mlp.fit(X_train, y_train)
+
+# # Generate a classification report
+# class_report = classification_report(y_valid, y_pred)
+# print("Classification Report:\n", class_report)
+
+
+# Train the model and collect loss values
+train_loss = []
+val_loss = []
+for i in range(mlp.max_iter):
+    mlp.partial_fit(X_train, y_train, classes=np.unique(y_train))
+    train_loss.append(mlp.loss_)
+    mlp.partial_fit(X_valid, y_valid, classes=np.unique(y_train))
+    val_loss.append(mlp.loss_)
+
+
+# Plot the training and validation loss curves
+plt.figure(figsize=(8, 6))
+plt.plot(train_loss, label='Training Loss')
+plt.plot(val_loss, label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss Curves')
+plt.legend()
+plt.show()
+
+
+
+# Make predictions on the valid data
+y_pred = mlp.predict(X_valid)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_valid, y_pred)
+print(f"Validation Accuracy: {accuracy:.2f}")
+
+# Make predictions on the test data
+y_pred = mlp.predict(X_test)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Test Accuracy: {accuracy:.2f}")
+
+# Make predictions on the train data
+y_pred = mlp.predict(X_train)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_train, y_pred)
+print(f"Train Accuracy: {accuracy:.2f}")
+
+```
+
+###  COSFIRE Descriptors Set 26
+
+```{python}
+num = 26
+
+df_training, df_testing = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\descriptor_set_{num}_train_test.mat")
+X_train = preprocessing.normalize(df_training.iloc[:, :-1].values)
+y_train = df_training.iloc[:, -1].values
+
+X_test = preprocessing.normalize(df_testing.iloc[:, :-1].values)
+y_test = df_testing.iloc[:, -1].values
+
+_, valid_df = get_data(rf"I:\My Drive\deep_learning\deep_hashing\deep_hashing_github\COSFIRE_26_valid_hyperparameters_descriptors\descriptors\descriptor_set_{num}_train_valid.mat")
+
+X_valid = preprocessing.normalize(valid_df.iloc[:, :-1].values)
+y_valid = valid_df.iloc[:, -1].values
+
+
+
+# a Multilayer perceptrons (MLP) with only 1 hidden layer consists of 100 neuron, on the trainnig dataset
+mlp = MLPClassifier(hidden_layer_sizes=(300,200,100,64),
+                    #learning_rate = 'adaptive',
+                    learning_rate_init=0.01,
+                    activation='tanh', # {"tanh", "relu"}
+                    solver='sgd', # {"lbfgs", "sgd", "adam"}
+					max_iter=800, random_state=42)
+
+
+# Train the model on the training data
+mlp.fit(X_train, y_train)
+
+# # Generate a classification report
+# class_report = classification_report(y_valid, y_pred)
+# print("Classification Report:\n", class_report)
+
+
+# Train the model and collect loss values
+train_loss = []
+val_loss = []
+for i in range(mlp.max_iter):
+    mlp.partial_fit(X_train, y_train, classes=np.unique(y_train))
+    train_loss.append(mlp.loss_)
+    mlp.partial_fit(X_valid, y_valid, classes=np.unique(y_train))
+    val_loss.append(mlp.loss_)
+
+
+# Plot the training and validation loss curves
+plt.figure(figsize=(8, 6))
+plt.plot(train_loss, label='Training Loss')
+plt.plot(val_loss, label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training and Validation Loss Curves')
+plt.legend()
+plt.show()
+
+
+
+# Make predictions on the valid data
+y_pred = mlp.predict(X_valid)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_valid, y_pred)
+print(f"Validation Accuracy: {accuracy:.2f}")
+
+# Make predictions on the test data
+y_pred = mlp.predict(X_test)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Test Accuracy: {accuracy:.2f}")
+
+# Make predictions on the train data
+y_pred = mlp.predict(X_train)
+
+# Calculate the accuracy of the model
+accuracy = accuracy_score(y_train, y_pred)
+print(f"Train Accuracy: {accuracy:.2f}")
+
+```
+::: 
+:::

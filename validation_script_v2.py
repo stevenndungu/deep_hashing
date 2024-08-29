@@ -1,17 +1,20 @@
 #%%
 from cosfire_workflow_utils import *
+from early_stopping_pytorch import *
 
 
 # Hyperparameters
 parser = argparse.ArgumentParser(description='COSFIRENet Training and Evaluation')
+#path = r"G:\My Drive\cosfire\COSFIREdescriptor.mat"
 parser.add_argument('--data_path', type=str, default= "COSFIREdescriptor.mat", help='Path to the COSFIREdescriptor.mat file')
+parser.add_argument('--data_path_valid', type=str, default= "COSFIREdescriptor_train_valid.mat", help='Path to the COSFIREdescriptor_train_valid.mat file')
+
 parser.add_argument('--input_size', type=int, default=200, help='Input size of the Descriptors')
 parser.add_argument('--output_size', type=int, default=36, help='Output size of the COSFIRENet')
 parser.add_argument('--learning_rate', type=float, default=0.01, help='Learning rate')
 parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
-parser.add_argument('--epochs', type=int, default=800, help='Number of epochs')
+parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs')
 parser.add_argument('--alpha', type=int, default= 1e-5)
-parser.add_argument('--props', type=int, default=0.1)
 parser.add_argument('--margin', type=int, default=36)
 
 
@@ -22,8 +25,8 @@ learning_rate = args.learning_rate
 batch_size = args.batch_size
 epochs = args.epochs
 data_path = args.data_path
+data_path_valid = args.data_path_valid
 alpha = args.alpha
-props = args.props
 margin = args.margin
 
 
@@ -50,7 +53,7 @@ class CosfireNet(nn.Module):
 # Data
 class CosfireDataset(Dataset):
     def __init__(self, dataframe):
-        self.data = torch.tensor(dataframe.iloc[:, :-1].values, dtype=torch.float32)
+        self.data = torch.tensor(preprocessing.normalize(dataframe.iloc[:, :-1].values), dtype=torch.float32)
         self.labels = torch.tensor(dataframe.iloc[:, -1].values, dtype=torch.float32)
 
     def __len__(self):
@@ -86,231 +89,240 @@ def DSHLoss(u, y, alpha, margin):
 
 
 #List of Grid search parameters to iterate over
-epoch_values = [200, 400,600, 800, 1000]
 learning_rate_values = [0.1, 0.01, 0.001]
 alphas = [1e-03, 1e-4, 1e-5]
 margin_values = [24, 36, 48]
-props_values = [0.4, 0.3, 0.2, 0.1]
 batch_size_values = [16, 32, 64]
 
 
 def run():
-    for epochs in epoch_values:
-        for learning_rate in learning_rate_values:
-            for alpha in alphas:
-                for margin in margin_values:
-                    for props in props_values:
-                        for batch_size in batch_size_values:
-                            path = args.data_path
-                            df_training, df_testing, train_label_code, valid_label_code, _ = get_data(path)
-                            
-                            train_df, valid_df = train_test_split(df_training, test_size=props, random_state=42)
-                            train_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
-                            valid_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
-                            df_training.rename(columns = {'label_name': 'label_code'}, inplace = True)
-                            df_testing.rename(columns = {'label_name': 'label_code'}, inplace = True)
+    for learning_rate in learning_rate_values:
+        for alpha in alphas:
+            for margin in margin_values:
+                for batch_size in batch_size_values:
+                    path = args.data_path
+                    path_valid = args.data_path_valid
+                    train_df, df_testing, _, _, _ = get_data(path)
+                    _, valid_df, _, _, _ = get_data(path_valid)
+                    
+                    
+                    
+                    train_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
+                    valid_df.rename(columns = {'label_name': 'label_code'}, inplace = True)
+                    df_testing.rename(columns = {'label_name': 'label_code'}, inplace = True)
 
-                            # Create DataLoader for training set
-                            train_dataset = CosfireDataset(train_df)
-                            train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                    # Create DataLoader for training set
+                    train_dataset = CosfireDataset(train_df)
+                    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-                            # Create DataLoader for validation set
-                            val_dataset = CosfireDataset(valid_df)
-                            val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+                    # Create DataLoader for validation set
+                    val_dataset = CosfireDataset(valid_df)
+                    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-                            # Instantiate CosfireNet
-                            model = CosfireNet(input_size, output_size)
-                            
-                            optimizer = optim.RMSprop(model.parameters(), lr=learning_rate)
-                            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.95)
+                    # Instantiate CosfireNet
+                    model = CosfireNet(input_size, output_size)
+                    
+                    optimizer = optim.RMSprop(model.parameters(), lr=learning_rate)
+                    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.95)
 
-                            # Lists to store training and validation losses
-                            train_losses = []
-                            val_losses = []
+                    # Lists to store training and validation losses
+                    train_losses = []
+                    val_losses = []
 
-                            # Variables to keep track of the best model
-                            # best_val_loss = float('inf')
-                            # best_model_path = 'best_model.pth'
+                    # Variables to keep track of the best model
+                    # best_val_loss = float('inf')
+                    # best_model_path = 'best_model.pth'
 
-                            # Training loop
-                            for _ in tqdm(range(epochs), desc='Training Progress', leave=True):
-                                model.train()
-                                total_train_loss = 0.0
-                                for _, (inputs, labels) in enumerate(train_dataloader):
-                                    optimizer.zero_grad()
-                                    u = model(inputs)
-                                    loss = DSHLoss(u = u, y=labels, alpha = alpha, margin = margin)
-                                    loss.backward()
-                                    optimizer.step()
-                                    total_train_loss += loss.item()
+                     # initialize the early_stopping object
+                    early_stopping = EarlyStopping(patience=patience, verbose=True)
 
-                                scheduler.step()
+                    # Training loop
+                    for _ in tqdm(range(epochs), desc='Training Progress', leave=True):
+                        model.train()
+                        total_train_loss = 0.0
+                        for _, (inputs, labels) in enumerate(train_dataloader):
+                            optimizer.zero_grad()
+                            u = model(inputs)
+                            loss = DSHLoss(u = u, y=labels, alpha = alpha, margin = margin)
+                            loss.backward()
+                            optimizer.step()
+                            total_train_loss += loss.item()
 
-                                # Calculate average training loss
-                                average_train_loss = total_train_loss / len(train_dataloader)
-                                train_losses.append(average_train_loss)
+                        scheduler.step()
 
-                                # Validation loop
-                                model.eval()
-                                total_val_loss = 0.0
-                                with torch.no_grad():
-                                    for val_inputs, val_labels in val_dataloader:
-                                        val_outputs = model(val_inputs)
-                                        val_loss = DSHLoss(u = val_outputs, y=val_labels, alpha = alpha, margin = margin)
-                                        total_val_loss += val_loss.item()
+                        # Calculate average training loss
+                        average_train_loss = total_train_loss / len(train_dataloader)
+                        train_losses.append(average_train_loss)
 
-                                # Calculate average validation loss
-                                average_val_loss = total_val_loss / len(val_dataloader)
-                                val_losses.append(average_val_loss)
+                        # Validation loop
+                        model.eval()
+                        total_val_loss = 0.0
+                        with torch.no_grad():
+                            for val_inputs, val_labels in val_dataloader:
+                                val_outputs = model(val_inputs)
+                                val_loss = DSHLoss(u = val_outputs, y=val_labels, alpha = alpha, margin = margin)
+                                total_val_loss += val_loss.item()
 
-                                # Save the model if it is the best so far
-                            #  if average_val_loss < best_val_loss:
-                            #      best_val_loss = average_val_loss
-                            #      torch.save(model.state_dict(), best_model_path)
+                        # Calculate average validation loss
+                        average_val_loss = total_val_loss / len(val_dataloader)
+                        val_losses.append(average_val_loss)
 
+                        # early_stopping needs the validation loss to check if it has decresed, 
+                        # and if it has, it will make a checkpoint of the current model
+                        early_stopping(average_val_loss, model)
+                    
+                        if early_stopping.early_stop:
+                            print("Early stopping")
+                            break
 
-
-                            ###################################
-                            ###       Evaluate              ###
-                            ###################################
-
-                            #model = CosfireNet(input_size, output_size)
-
-                            # Load the best model
-                            # best_model_path = 'best_model.pth'
-                            # model.load_state_dict(torch.load(best_model_path))
-                            model.eval()
-
-                            valid_dataset = CosfireDataset(valid_df)
-                            valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
-
-                            train_dataset = CosfireDataset(train_df)
-                            train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-
-                            test_dataset = CosfireDataset(df_testing)
-                            test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-                            train_dataset_full = CosfireDataset(df_training)
-                            train_dataloader_full = DataLoader(train_dataset_full, batch_size=batch_size, shuffle=False)
-
-                            # Lists to store predictions
-                            predictions = []
-
-                            # Perform predictions on the train set
-                            with torch.no_grad():
-                                for train_inputs, _ in tqdm(train_dataloader, desc='Predicting', leave=True):
-                                    train_outputs = model(train_inputs)
-                                    predictions.append(train_outputs.numpy())
-
-                            # Flatten the predictions
-                            flat_predictions_train = [item for sublist in predictions for item in sublist]
-
-                            # Append predictions to the df_train DataFrame
-                            train_df['predictions'] = flat_predictions_train
-                            
-                            #################################################################
-
-                            # Lists to store predictions
-                            predictions = []
-
-                            # Perform predictions on the valid set
-                            with torch.no_grad():
-                                for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
-                                    valid_outputs = model(valid_inputs)
-                                    predictions.append(valid_outputs.numpy())
-
-                            # Flatten the predictions
-                            flat_predictions_valid = [item for sublist in predictions for item in sublist]
-
-                            # Append predictions to the valid_df DataFrame
-                            valid_df['predictions'] = flat_predictions_valid
-                            
-                            ################################################################
+                        # Save the model if it is the best so far
+                        #  if average_val_loss < best_val_loss:
+                        #      best_val_loss = average_val_loss
+                        #      torch.save(model.state_dict(), best_model_path)
 
 
-                            thresholds = list(range(0,105,5))
-                            
-                            mAP_results = []
-                            for _,thresh in enumerate(thresholds):
-                                maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True)
-                                mAP_results.append(maP)
+
+                    ###################################
+                    ###       Evaluate              ###
+                    ###################################
+
+                    #model = CosfireNet(input_size, output_size)
+
+                    # Load the best model
+                    # best_model_path = 'best_model.pth'
+                    # model.load_state_dict(torch.load(best_model_path))
+                    # load the last checkpoint with the best model
+                    model.load_state_dict(torch.load('checkpoint.pt'))
+                    model.eval()
+
+                    valid_dataset = CosfireDataset(valid_df)
+                    valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+
+                    test_dataset = CosfireDataset(df_testing)
+                    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+                    train_dataset_full = CosfireDataset(train_df)
+                    train_dataloader_full = DataLoader(train_dataset_full, batch_size=batch_size, shuffle=False)
+
+                    # Lists to store predictions
+                    predictions = []
+
+                    # Perform predictions on the train set
+                    with torch.no_grad():
+                        for train_inputs, _ in tqdm(train_dataloader_full, desc='Predicting', leave=True):
+                            train_outputs = model(train_inputs)
+                            predictions.append(train_outputs.numpy())
+
+                    # Flatten the predictions
+                    flat_predictions_train = [item for sublist in predictions for item in sublist]
+
+                    # Append predictions to the df_train DataFrame
+                    train_df['predictions'] = flat_predictions_train
+                    
+                    #################################################################
+
+                    # Lists to store predictions
+                    predictions = []
+
+                    # Perform predictions on the valid set
+                    with torch.no_grad():
+                        for valid_inputs, _ in tqdm(valid_dataloader, desc='Predicting', leave=True):
+                            valid_outputs = model(valid_inputs)
+                            predictions.append(valid_outputs.numpy())
+
+                    # Flatten the predictions
+                    flat_predictions_valid = [item for sublist in predictions for item in sublist]
+
+                    # Append predictions to the valid_df DataFrame
+                    valid_df['predictions'] = flat_predictions_valid
+                    
+                    ################################################################
 
 
-                            data = {'mAP': mAP_results,
-                                    'threshold': thresholds}
+                    thresholds = list(range(0,105,5))
+                    
+                    mAP_results = []
+                    for _,thresh in enumerate(thresholds):
+                        maP,train_binary, train_label, valid_binary, valid_label = mAP_values(train_df,valid_df,thresh, percentile = True)
+                        mAP_results.append(maP)
 
-                            df = pd.DataFrame(data)
-                            
-                            # Find the index of the maximum mAP value
-                            max_map_index = df['mAP'].idxmax()
 
-                            # Retrieve the threshold corresponding to the maximum mAP
-                            threshold_max_map = df.loc[max_map_index, 'threshold']
-                            maP,_, _, _, _ = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True)
+                    data = {'mAP': mAP_results,
+                            'threshold': thresholds}
 
-                           
-                            ##########################################################################
-                            # Testing
-                            ##########################################################################
+                    df = pd.DataFrame(data)
+                    
+                    # Find the index of the maximum mAP value
+                    max_map_index = df['mAP'].idxmax()
 
-                            # Perform predictions on the testing set
-                             # Lists to store predictions
-                            predictions_test = []
-                            with torch.no_grad():
-                                for test_inputs, _ in tqdm(test_dataloader, desc='Predicting', leave=True):
-                                    test_outputs = model(test_inputs)
-                                    predictions_test.append(test_outputs.numpy())
+                    # Retrieve the threshold corresponding to the maximum mAP
+                    threshold_max_map = df.loc[max_map_index, 'threshold']
+                    maP,_, _, _, _ = mAP_values(train_df,valid_df,thresh = threshold_max_map, percentile = True)
 
-                            # Flatten the predictions
-                            flat_predictions_test = [item for sublist in predictions_test for item in sublist]
+                    
+                    ##########################################################################
+                    # Testing
+                    ##########################################################################
 
-                            # Append predictions to the df_testing DataFrame
-                            df_testing['predictions'] = flat_predictions_test
+                    # Perform predictions on the testing set
+                        # Lists to store predictions
+                    predictions_test = []
+                    with torch.no_grad():
+                        for test_inputs, _ in tqdm(test_dataloader, desc='Predicting', leave=True):
+                            test_outputs = model(test_inputs)
+                            predictions_test.append(test_outputs.numpy())
 
-                            # Perform predictions on the training set
-                            predictions_train_full = []
-                            with torch.no_grad():
-                                for train_inputs, _ in tqdm(train_dataloader_full, desc='Predicting', leave=True):
-                                    train_outputs = model(train_inputs)
-                                    predictions_train_full.append(train_outputs.numpy())
+                    # Flatten the predictions
+                    flat_predictions_test = [item for sublist in predictions_test for item in sublist]
 
-                            # Flatten the predictions
-                            flat_predictions_train_full = [item for sublist in predictions_train_full for item in sublist]
+                    # Append predictions to the df_testing DataFrame
+                    df_testing['predictions'] = flat_predictions_test
 
-                            # Append predictions to the df_testing DataFrame
-                            df_training['predictions'] = flat_predictions_train_full
-                            
-                            
+                    # Perform predictions on the training set
+                    predictions_train_full = []
+                    with torch.no_grad():
+                        for train_inputs, _ in tqdm(train_dataloader_full, desc='Predicting', leave=True):
+                            train_outputs = model(train_inputs)
+                            predictions_train_full.append(train_outputs.numpy())
 
-                            mAP_test,_, _, _, _ = mAP_values(df_training,df_testing,thresh = threshold_max_map, percentile = True)
+                    # Flatten the predictions
+                    flat_predictions_train_full = [item for sublist in predictions_train_full for item in sublist]
 
+                    # Append predictions to the df_train DataFrame
+                    train_df['predictions'] = flat_predictions_train_full
+                    
+                    
+
+                    mAP_test,_, _, _, _ = mAP_values(train_df,df_testing,thresh = threshold_max_map, percentile = True)
+
+                
+
+                    results = {
+                        'input_size': input_size,
+                        'output_size': output_size,
+                        'learning_rate': learning_rate,
+                        'batch_size': batch_size,
+                        'epochs': epochs,
+                        'threshold_max_map': threshold_max_map,
+                        'mAP_valid': maP,
+                        'mAP_test': mAP_test,
+                        'alpha': alpha,
+                        'model_type' : 'model_v5',
+                        "margin": margin
+                    
                         
+                    }
+                    results_df = pd.DataFrame([results])
+                    if not os.path.isfile("model_selection_valid_and_test_20042024.csv"):
+                        
+                        df = pd.DataFrame(columns=['input_size', 'output_size', 'learning_rate', 'batch_size', 'epochs','threshold_max_map', 'mAP_valid', "mAP_test",'alpha', 'model_type', 'margin'])
+                        df.to_csv("model_selection_valid_and_test_20042024.csv", index=False)
+                    else:
+                        df = pd.read_csv("model_selection_valid_and_test_20042024.csv")
+                    
+                    results_df = pd.concat([df, results_df], ignore_index=True)
 
-                            results = {
-                                'input_size': input_size,
-                                'output_size': output_size,
-                                'learning_rate': learning_rate,
-                                'batch_size': batch_size,
-                                'epochs': epochs,
-                                'threshold_max_map': threshold_max_map,
-                                'mAP_valid': maP,
-                                'mAP_test': mAP_test,
-                                'alpha': alpha,
-                                'model_type' : 'model_v5',
-                                "props": props,
-                                "margin": margin
-                            
-                                
-                            }
-                            results_df = pd.DataFrame([results])
-                            if not os.path.isfile("model_selection_validation.csv"):
-                                
-                                df = pd.DataFrame(columns=['input_size', 'output_size', 'learning_rate', 'batch_size', 'epochs','threshold_max_map', 'mAP', 'alpha', 'model_type', 'props', 'margin'])
-                                df.to_csv("model_selection_validation.csv", index=False)
-                            else:
-                                df = pd.read_csv("model_selection_validation.csv")
-                                results_df = pd.concat([df, results_df], ignore_index=True)
-                                results_df.to_csv('model_selection_validation.csv', index=False)
+    results_df.to_csv('model_selection_valid_and_test_20042024.csv', index=False)
 
 
 if __name__ == '__main__' :

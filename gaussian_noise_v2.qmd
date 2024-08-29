@@ -1,0 +1,177 @@
+---
+title: "Image Retrieval"
+date: today
+date-format: long
+author: "Steven  Ndung'u et al."
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    page-layout: full
+    theme:
+          light: flatly
+          dark: darkly
+    number-sections: false
+    highlighting: true
+    smooth-scroll: true
+    code-fold: false
+    highlighting-style: GitHub
+    self-contained: true
+execute:
+    echo: true
+    warning: false
+    enable: true
+
+title-block-banner: true
+
+---
+
+```{=html}
+<style type="text/css">
+
+h1.title {
+  font-size: 20px;
+  color: White;
+  text-align: center;
+}
+h4.author { /* Header 4 - and the author and data headers use this too  */
+    font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+h4.date { /* Header 4 - and the author and data headers use this too  */
+  font-size: 16px;
+  font-family: "Source Sans Pro Semibold", Times, serif;
+  color: Red;
+  text-align: center;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+:::{.column-page}
+
+::: {style="text-align:center"}
+<h2>Gaussian Noise in Astronomical images</h2>
+:::
+
+</br>
+
+Example of blurring
+
+```{python}
+import numpy as np
+import os, random
+#from matplotlib import cm
+import matplotlib.pyplot as plt
+from PIL import Image, ImageFilter
+#from scipy.ndimage import gaussian_filter
+
+
+seed = 100
+random.seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+np.random.seed(seed)
+
+
+
+image1 = Image.open(r"C:\Users\P307791\Pictures\RugInfo.PNG")
+
+fig, (ax1,  ax2) = plt.subplots(1, 2, figsize=(10, 5))
+
+ax1.imshow(np.array(image1) , cmap='gray')
+ax1.set_title('Original image')
+ax1.axis('off') 
+
+image1 = image1.filter(ImageFilter.GaussianBlur(radius=3))
+
+ax2.imshow(np.array(image1) , cmap='gray')
+ax2.set_title('Blurred at Sigma=3')
+ax2.axis('off') 
+plt.tight_layout()
+plt.show()
+
+```
+
+Step 1: First create a random Gaussian Image with mean=0, standard deviation=1 with the dimension similar to that of our images.
+
+Step 2: Create a Gaussian kernel with peak amplitude of 1 and standard deviation equal to full width at half maximum (fwhm=5) * resolution of the telescope and then convolve on the Gaussian image.
+
+Note: The final images from FIRST, produced by coadding the twelve (or sometimes more) single-field pointings adjacent to each pointing center, have 1.8" pixels, a typical rms of 0.15 mJy, and a resolution of 5".
+
+
+$\text{Number of pixels} = \frac{\text{ Number of arcsecond}}{\text{Resolution (arcseconds per pixel)}} $
+
+
+```{python}
+#| echo: true
+###| layout-ncol: 1
+#$Env:QUARTO_PYTHON = "C:\Users\P307791\Anaconda3\python.exe"
+def apply_gaussian_noise(mean_val=0, sigma_val=1,blur_sigma=25):
+   # Set the dimensions of the image
+   width, height = 150, 150
+
+   # Generate a random image with Gaussian distribution (mean 0, sigma 1)
+   random_image = np.random.normal(loc=mean_val, scale=sigma_val, size=(height, width))
+
+
+   # Convert the random image to a PIL Image
+   random_image_pil = Image.fromarray((255 * (random_image - np.min(random_image)) / (np.max(random_image) - np.min(random_image))).astype(np.uint8))
+
+
+
+   filtered_image = random_image_pil.filter(ImageFilter.GaussianBlur(radius=blur_sigma))
+
+   return random_image, filtered_image
+
+random_image, filtered_image = apply_gaussian_noise(mean_val=0, sigma_val=1,blur_sigma=25)
+
+
+
+fig, (ax1,ax3) = plt.subplots(1,2,figsize=(10,5))
+
+ax1.imshow(random_image, cmap='gray')
+ax1.set_title('Random Gaussian Image (mean=0, sigma=1)')
+ax1.axis('off')
+
+ax3.imshow(filtered_image, cmap='gray')
+ax3.set_title('Resultant Gaussian noise image - V2')
+ax3.axis('off')
+
+plt.tight_layout()
+plt.show()
+
+```
+
+Step 3: Add the convolved Gaussian noise image to the image source you have.
+
+```{python}
+#| echo: true
+###| layout-ncol: 1
+
+image = Image.open(r"I:\My Drive\deep_learning\deep_hashing\data_complete\train\Bent\J004151.59+002836.2.jpg")
+
+# Create a figure with 1 row and 3 columns
+fig, (ax1,  ax3) = plt.subplots(1, 2, figsize=(10, 5))
+
+# First subplot
+ax1.imshow(np.array(image)[:,:,1], cmap='gray')
+ax1.set_title('Original Image')
+ax1.axis('off') 
+
+
+# Third subplot
+ax3.imshow(np.array(image)[:,:,1] + np.array(filtered_image), cmap='gray')
+ax3.set_title('Image with Gaussian perturbation - V2')
+ax3.axis('off')
+
+# Adjust the layout and display the plot
+plt.tight_layout()
+plt.show()
+```
+
+
+:::
+:::
