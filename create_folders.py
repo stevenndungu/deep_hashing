@@ -1,10 +1,15 @@
 #%%
 import os
 
-class_img = ['Bent', 'Compact', 'FRI', 'FRII']
-folder = ['train', 'test', 'valid']
-folder_name = 'data_gnoise_f5/'
+folder = ['Bent', 'Compact', 'FRI', 'FRII']
+class_img = ['train', 'test', 'valid']
+
+# class_img = ['Bent', 'Compact', 'FRI', 'FRII']
+# folder = ['train', 'test', 'valid']
+
+folder_name = 'data_complete_gnoise_f05'
 path = '.'
+
 folder_path = os.path.join(path, folder_name)
 
 # Create the main folder if it doesn't exist
@@ -20,4 +25,5 @@ for class_im in class_img:
         subfolder_path = os.path.join(class_path, flder)
         if not os.path.exists(subfolder_path):
             os.makedirs(subfolder_path)
-# %%
+
+

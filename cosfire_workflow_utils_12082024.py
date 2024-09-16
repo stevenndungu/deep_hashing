@@ -79,6 +79,83 @@ def generate_unique_identifier(length):
 
 
 #%%
+# def SimplifiedTopMap(rB, qB, retrievalL, queryL, topk):
+#   '''
+#     rB - binary codes of the training set - reference set,
+#     qB - binary codes of the query set,
+#     retrievalL - labels of the training set - reference set, 
+#     queryL - labels of the query set, and 
+#     topk - the number of top retrieved results to consider.
+
+#     rB = r_binary
+#     qB = q_binary
+#     retrievalL = train_label
+#     queryL = valid_label
+#     topk = 100
+#   '''
+#   num_query = queryL.shape[0]
+#   mAP = [0] * num_query
+ 
+#   for i, query in enumerate(queryL):
+
+#     rel = (np.dot(query, retrievalL.transpose()) > 0)*1 # relevant train label refs.
+#     hamm = np.count_nonzero(qB[i] != rB, axis=1) #hamming distance
+#     ind = np.argsort(hamm) #  Hamming distances in ascending order.
+#     rel = rel[ind] #rel is reordered based on the sorted indices ind, so that it corresponds to the sorted Hamming distances.
+
+#     top_rel = rel[:topk] #contains the relevance values for the top-k retrieved results
+#     tot_relevant_sum = np.sum(top_rel) #total number of relevant images in the top-k retrieved results
+
+#     #skips the iteration if there are no relevant results.
+#     if tot_relevant_sum == 0:
+#         continue
+
+#     pr_num = np.linspace(1, tot_relevant_sum, tot_relevant_sum) 
+#     pr_denom = np.asarray(np.where(top_rel == 1)) + 1.0 #is the indices where top_rel is equal to 1 (i.e., the positions of relevant images)
+#     pr = pr_num / pr_denom # precision
+#     # dic_labels_rev = { 2:'Bent',
+#     #             3:'Compact',
+#     #               0:'FRI',
+#     #               1: 'FRII'
+#     #           }
+#     if (query == np.array([0, 0, 1, 0])).sum()==4:#Bent
+#          mAP_sub = np.sum(pr) /np.min(np.array([305,topk]))
+#     elif (query == np.array([0, 1, 0, 0])).sum()==4:#FRII
+#          mAP_sub = np.sum(pr) / np.min(np.array([434,topk]))
+#     elif (query == np.array([1, 0, 0, 0])).sum()==4:#FRI
+#          mAP_sub = np.sum(pr) /  np.min(np.array([215,topk]))
+#     else:# (query == np.array([0, 0, 0, 1])).sum()==4:#Compact
+#          mAP_sub = np.sum(pr) / np.min(np.array([226,topk]))
+   
+#     #mAP_sub = np.sum(pr) / topk
+
+#     mAP[i] = mAP_sub 
+    
+      
+#   #return np.mean(mAP)*100, stats.median_abs_deviation(mAP, scale=1)*100, mAP_values
+#   return np.mean(mAP)*100, np.std(mAP)*100, mAP
+
+
+# def mAP_values(r_database,q_database, thresh = 0.5, percentile = True, topk = 100):
+#     if percentile:
+#         r_binary = np.array([((out >= np.percentile(out,thresh))*1).tolist()  for _, out in enumerate(r_database.predictions)])
+#         q_binary = np.array([((out >= np.percentile(out,thresh))*1).tolist()  for _, out in enumerate(q_database.predictions)])
+#     else:
+#         r_binary = np.array([((out >= thresh) * 1).tolist() for _, out in enumerate(r_database.predictions)])
+#         q_binary = np.array([((out >= thresh) * 1).tolist() for _, out in enumerate(q_database.predictions)])
+
+#     train_label = label_binarize(r_database.label_code, classes=[0, 1, 2,3])
+#     valid_label = label_binarize(q_database.label_code, classes=[0,1, 2,3])
+
+#     rB = r_binary
+#     qB = q_binary
+#     retrievalL = train_label
+#     queryL = valid_label
+#     topk = topk
+#     mAP, mAP_std, mAP_values1 = SimplifiedTopMap(rB, qB, retrievalL, queryL, topk)
+  
+#     return mAP,mAP_std,mAP_values1, r_binary, train_label, q_binary, valid_label
+
 def SimplifiedTopMap(rB, qB, retrievalL, queryL, topk):
   '''
     rB - binary codes of the training set - reference set,
@@ -155,8 +232,89 @@ def mAP_values(r_database,q_database, thresh = 0.5, percentile = True, topk = 10
     mAP, mAP_std, mAP_values1 = SimplifiedTopMap(rB, qB, retrievalL, queryL, topk)
   
     return mAP,mAP_std,mAP_values1, r_binary, train_label, q_binary, valid_label
+#%%
+
+def SimplifiedTopMap_v2(rB, qB, retrievalL, queryL, topk):
+  '''
+    rB - binary codes of the training set - reference set,
+    qB - binary codes of the query set,
+    retrievalL - labels of the training set - reference set, 
+    queryL - labels of the query set, and 
+    topk - the number of top retrieved results to consider.
+
+    rB = r_binary
+    qB = q_binary
+    retrievalL = train_label
+    queryL = valid_label
+    topk = 100
+  '''
+  num_query = queryL.shape[0]
+  mAP = [0] * num_query
+  pr_denom_dic = {}
+ 
+  for i, query in enumerate(queryL):
+
+    rel = (np.dot(query, retrievalL.transpose()) > 0)*1 # relevant train label refs.
+    hamm = np.count_nonzero(qB[i] != rB, axis=1) #hamming distance
+    ind = np.argsort(hamm) #  Hamming distances in ascending order.
+    rel = rel[ind] #rel is reordered based on the sorted indices ind, so that it corresponds to the sorted Hamming distances.
+
+    top_rel = rel[:topk] #contains the relevance values for the top-k retrieved results
+    tot_relevant_sum = np.sum(top_rel) #total number of relevant images in the top-k retrieved results
+
+    #skips the iteration if there are no relevant results.
+    if tot_relevant_sum == 0:
+        continue
+
+    pr_num = np.linspace(1, tot_relevant_sum, tot_relevant_sum) 
+    pr_denom = np.asarray(np.where(top_rel == 1)) + 1.0 #is the indices where top_rel is equal to 1 (i.e., the positions of relevant images)
+    pr = pr_num / pr_denom # precision
+    pr_denom_dic[i] = pr_denom
+    # dic_labels_rev = { 2:'Bent',
+    #             3:'Compact',
+    #               0:'FRI',
+    #               1: 'FRII'
+    #           }
+    if (query == np.array([0, 0, 1, 0])).sum()==4:#Bent
+         mAP_sub = np.sum(pr) /np.min(np.array([305,topk]))
+    elif (query == np.array([0, 1, 0, 0])).sum()==4:#FRII
+         mAP_sub = np.sum(pr) / np.min(np.array([434,topk]))
+    elif (query == np.array([1, 0, 0, 0])).sum()==4:#FRI
+         mAP_sub = np.sum(pr) /  np.min(np.array([215,topk]))
+    else:# (query == np.array([0, 0, 0, 1])).sum()==4:#Compact
+         mAP_sub = np.sum(pr) / np.min(np.array([226,topk]))
+   
+    #mAP_sub = np.sum(pr) / topk
+
+    mAP[i] = mAP_sub 
+    
+      
+  #return np.mean(mAP)*100, stats.median_abs_deviation(mAP, scale=1)*100, mAP_values
+  return np.mean(mAP)*100, np.std(mAP)*100, mAP, pr_denom_dic
+
+
+def mAP_values_v2(r_database,q_database, thresh = 0.5, percentile = True, topk = 100):
+    if percentile:
+        r_binary = np.array([((out >= np.percentile(out,thresh))*1).tolist()  for _, out in enumerate(r_database.predictions)])
+        q_binary = np.array([((out >= np.percentile(out,thresh))*1).tolist()  for _, out in enumerate(q_database.predictions)])
+    else:
+        r_binary = np.array([((out >= thresh) * 1).tolist() for _, out in enumerate(r_database.predictions)])
+        q_binary = np.array([((out >= thresh) * 1).tolist() for _, out in enumerate(q_database.predictions)])
+
+    train_label = label_binarize(r_database.label_code, classes=[0, 1, 2,3])
+    valid_label = label_binarize(q_database.label_code, classes=[0,1, 2,3])
+
+    rB = r_binary
+    qB = q_binary
+    retrievalL = train_label
+    queryL = valid_label
+    topk = topk
+    mAP, mAP_std, mAP_values1, pr_denom = SimplifiedTopMap_v2(rB, qB, retrievalL, queryL, topk)
+  
+    return mAP,mAP_std,mAP_values1, pr_denom, r_binary, train_label, q_binary, valid_label
 
 #%%
+
 
 def CalcTopMapWithPR123(referenceBinaryCodes, queryBinaryCodes, referenceLabels, queryLabels, topk):
     '''
@@ -299,6 +457,8 @@ def CalcTopMapWithPR(referenceBinaryCodes, queryBinaryCodes, referenceLabels, qu
         topkAveragePrecision = np.mean(relevantCount / relevantIndices)  # Average precision for the top-k
         mAPs[i] = topkAveragePrecision  # Store mAP for this query
         topkmap += topkAveragePrecision  # Accumulate the top-k mAP
+
+        
 
     topkmap /= numQueries  # Normalize by the number of queries
 
@@ -721,5 +881,40 @@ def convert_numpy(obj):
         return {key: convert_numpy(value) for key, value in obj.items()}
     elif isinstance(obj, list):
         return [convert_numpy(item) for item in obj]
+    else:
+        return obj
+    
+def normalize_distance(arr):
+   min_value = np.min(arr)
+   max_value = np.max(arr)
+   normalize_distance = (arr - min_value) / (max_value - min_value)
+   return normalize_distance
+
+def calculate_norm_distance(vector_a, vector_b):
+   vector_a = np.array(ast.literal_eval(vector_a))
+   vector_b = np.array(ast.literal_eval(vector_b))
+   dist = np.linalg.norm(vector_a - vector_b)
+   return dist
+
+def calculate_norm_distance_v2(vector_a, vector_b):
+   dist = np.linalg.norm(vector_a - vector_b)
+   return dist
+
+def normalize_distance(arr):
+   min_value = np.min(arr)
+   max_value = np.max(arr)
+   normalize_distance = (arr - min_value) / (max_value - min_value)
+   return normalize_distance
+
+# Convert numpy.float32 to float in the dictionary
+def convert_to_serializable(obj):
+    if isinstance(obj, np.float32):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()  # Convert numpy arrays to lists
+    elif isinstance(obj, dict):
+        return {k: convert_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_serializable(i) for i in obj]
     else:
         return obj
