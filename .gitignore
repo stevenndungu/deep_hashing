@@ -86,6 +86,7 @@ overall_noise_results/
 paper images 28082024/
 cosfire_rg_classification/
 radio_v3/
+*radio
 paper images/
 .quarto/
 data/
@@ -93,7 +94,6 @@ utils/
 *.zip
 *.json
 *.csv
-<<<<<<< HEAD
 *.jpg
 *.mat
 # Used by py.test
@@ -153,22 +153,8 @@ sklearn/neighbors/_kd_tree.pyx
 # Default JupyterLite content
 jupyterlite_contents
 /paper images/
+/paper images 28082024
 *.svg
 *.png
-inal paper results/
-=======
-*.mat
-models/
-*.pth
-#models/IMR_DNT161_model_data-balanced_Tue_Feb__7_09_10_59_2023.pth
-data_Fri_May__3_16_15_49_2024/
-model_OhbV/
-COSFIRE_26_valid_hyperparameters_descriptors/
-present_13052023/     
 
-Train_valid_curves.png
-Train_valid_curves2
-Train_valid_curves3
-data_results/
-model_selection_valid_and_test_20052024.gsheet
->>>>>>> 7f842b1df81eb088a93a75765db0735c79f71bc3
+inal paper results/
