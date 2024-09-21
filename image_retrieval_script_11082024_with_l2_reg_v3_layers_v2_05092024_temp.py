@@ -33,15 +33,15 @@ The best bit size is 72 based on validation results. Then, based on the 26 data 
 for better illustration use...
 372,72,0.01,64,0.001,36,0.0,0.0
 '''
-num = 11
-epochs = 2000
-bitsize = 72
-learning_rate = 0.01
-batch_size = 64
-alpha = 0.00001
-margin = 24
-l1_reg = 0
-l2_reg = 1e-8	
+# num = 11
+# epochs = 2000
+# bitsize = 72
+# learning_rate = 0.01
+# batch_size = 64
+# alpha = 0.00001
+# margin = 24
+# l1_reg = 0
+# l2_reg = 1e-8	
 
 print('Descriptor number: ', num)
 data_path = f"./descriptors_v2/descriptor_set_{num}_train_valid_test.mat" # Path to the Train_valid_test.mat file
