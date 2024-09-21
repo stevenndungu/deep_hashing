@@ -2954,68 +2954,88 @@ df_melted.to_csv('df_melted.csv', index=False)
 
 ```
 
+Overall reported results:
 
 
 ```{python}
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pandas as pd
-
-# import matplotlib.font_manager
-# matplotlib.font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
-
-sns.set_style("white")
-
-SMALL_SIZE = 7
-MEDIUM_SIZE = 7
-BIGGER_SIZE = 7
-
-plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-#plt.rc('figure', titlesize=BIGGER_SIZE)
-# Data
-# Create the plot
-fig, ax = plt.subplots(figsize=(10/3, 3))
-sns.set_style("whitegrid")
-plt.legend(loc = 'upper left')
-# Show the plot
-plt.rc('font', family='Nimbus Roman')
 
 df = pd.merge(result_merged_mwu_best, result_merged_mwu_std, on=['bit'])
-df = df.query('bit!=8')
-# Create line plot
-sns.lineplot(data=df, x='bit', y='test_score',label='Test',  color='blue')
-sns.lineplot(data=df, x='bit', y='valid_score',label='Valid',  color='red')
-# sns.lineplot(data=df, x='bit', y='valid_score_std',  color='blue')
-# sns.lineplot(data=df, x='bit', y='test_score_std',  color='red')
-# Fill standard deviation envelopes for 'test_score' and 'valid_score'
-plt.fill_between(df['bit'], df['test_score'] - df['test_score_std'], df['test_score'] + df['test_score_std'], color='#439CEF')
-plt.fill_between(df['bit'], df['valid_score'] - df['valid_score_std'], df['valid_score'] + df['valid_score_std'], color='#ffbaba')
+df_report = df[['bit','valid_score','valid_score_std']]
+df_report.to_csv('paper images/df_report.csv', index=False)
 
-plt.scatter(72, df['test_score'].iloc[7], color='blue', marker='o', s=25)
-plt.scatter(72, df['valid_score'].iloc[7], color='red', marker='o', s=25)
+html_table = df_report.to_html(index=True)
 
-ax.set_ylabel('mAP')
-ax.set_xlabel('Bit size')
-ax = plt.gca()
-# Set y-axis to start from a specific value
-plt.ylim(85, 93)
+# Wrap in a scrollable div
+scrollable_table = f"""
+<div style="height: 500px; width: 100%; overflow-x: auto; overflow-y: auto;">
+    {html_table}
+</div>
+"""
+# Display the scrollable table
+display(HTML(scrollable_table))
 
-# Set x-axis labels and ticks
-x_labels = np.unique(np.array(df.bit))
-plt.xticks(ticks=x_labels, labels=x_labels)
-plt.grid(False)
-# Show the plot
-plt.tight_layout()
-plt.savefig('paper images/valid_test.svg',format='svg', dpi=1200)
-plt.show()
+```
+
+```{python}
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+# import pandas as pd
+
+# # import matplotlib.font_manager
+# # matplotlib.font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
+
+# sns.set_style("white")
+
+# SMALL_SIZE = 7
+# MEDIUM_SIZE = 7
+# BIGGER_SIZE = 7
+
+# plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+# plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+# plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+# plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+# #plt.rc('figure', titlesize=BIGGER_SIZE)
+# # Data
+# # Create the plot
+# fig, ax = plt.subplots(figsize=(10/3, 3))
+# sns.set_style("whitegrid")
+# plt.legend(loc = 'upper left')
+# # Show the plot
+# plt.rc('font', family='Nimbus Roman')
+
+# df = pd.merge(result_merged_mwu_best, result_merged_mwu_std, on=['bit'])
+# df = df.query('bit!=8')
+# # Create line plot
+# sns.lineplot(data=df, x='bit', y='test_score',label='Test',  color='blue')
+# sns.lineplot(data=df, x='bit', y='valid_score',label='Valid',  color='red')
+# # sns.lineplot(data=df, x='bit', y='valid_score_std',  color='blue')
+# # sns.lineplot(data=df, x='bit', y='test_score_std',  color='red')
+# # Fill standard deviation envelopes for 'test_score' and 'valid_score'
+# plt.fill_between(df['bit'], df['test_score'] - df['test_score_std'], df['test_score'] + df['test_score_std'], color='#439CEF')
+# plt.fill_between(df['bit'], df['valid_score'] - df['valid_score_std'], df['valid_score'] + df['valid_score_std'], color='#ffbaba')
+
+# plt.scatter(72, df['test_score'].iloc[7], color='blue', marker='o', s=25)
+# plt.scatter(72, df['valid_score'].iloc[7], color='red', marker='o', s=25)
+
+# ax.set_ylabel('mAP')
+# ax.set_xlabel('Bit size')
+# ax = plt.gca()
+# # Set y-axis to start from a specific value
+# plt.ylim(85, 93)
+
+# # Set x-axis labels and ticks
+# x_labels = np.unique(np.array(df.bit))
+# plt.xticks(ticks=x_labels, labels=x_labels)
+# plt.grid(False)
+# # Show the plot
+# plt.tight_layout()
+# plt.savefig('paper images/valid_test.svg',format='svg', dpi=1200)
+# plt.show()
 
 print('average performance for all the 26 discriptors in 72 bit: ')
-res = result_merged_mwu_72[['valid_score','test_score']].describe()
+res = result_merged_mwu_72[['valid_score','test_score']].describe().iloc[1:3]
 
 html_table = res.to_html(index=True)
 
@@ -3028,5 +3048,10 @@ scrollable_table = f"""
 # Display the scrollable table
 display(HTML(scrollable_table))
 ```
+
+
+
+
+
 :::
 
