@@ -3149,8 +3149,10 @@ Distance comparisons
 <section id="inter--and-intra--class-distances" class="level3">
 <h3 class="anchored" data-anchor-id="inter--and-intra--class-distances">Inter- and intra- class distances</h3>
 <p>Inter-class distances are calculated using the Hamming distance between the different classes. Intra-class distances are calculated using the Hamming distance between the predicted binary masks of the same class.</p>
-<p>Train data:</p>
-<div id="1b4e30ba" class="cell" data-execution_count="1">
+</section>
+<section id="train-data" class="level2">
+<h2 class="anchored" data-anchor-id="train-data">Train data:</h2>
+<div id="e6c0f1da" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> python_modules <span class="im">import</span> <span class="op">*</span></span>
@@ -3177,7 +3179,7 @@ Distance comparisons
 <span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>df_results <span class="op">=</span> pd.read_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances.csv&#39;</span>)</span>
 <span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>df_results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="1">
+<div class="cell-output cell-output-display" data-execution_count="11">
 <div>
 <div>
 
@@ -3238,14 +3240,16 @@ Distance comparisons
 </div>
 </div>
 </div>
-<p>Test data:</p>
-<div id="f020e0fb" class="cell" data-execution_count="2">
+</section>
+<section id="test-data" class="level2">
+<h2 class="anchored" data-anchor-id="test-data">Test data:</h2>
+<div id="2e083e68" class="cell" data-execution_count="2">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>df_results_test <span class="op">=</span> pd.read_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances_test.csv&#39;</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>df_results_test</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="2">
+<div class="cell-output cell-output-display" data-execution_count="12">
 <div>
 <div>
 
@@ -3306,13 +3310,16 @@ Distance comparisons
 </div>
 </div>
 </div>
-<div id="0ee89a35" class="cell" data-execution_count="3">
+</section>
+<section id="test-data-vs-train-data" class="level2">
+<h2 class="anchored" data-anchor-id="test-data-vs-train-data">Test data vs Train data:</h2>
+<div id="93ef7210" class="cell" data-execution_count="3">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>df_results_test_test_train <span class="op">=</span> pd.read_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances_test_train.csv&#39;</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>df_results_test_test_train</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="3">
+<div class="cell-output cell-output-display" data-execution_count="13">
 <div>
 <div>
 
@@ -3377,7 +3384,7 @@ Distance comparisons
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href>DenseNet</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href>COSFIRE</a></li></ul>
 <div class="tab-content">
 <div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
-<div id="e4b153c0" class="cell" data-execution_count="4">
+<div id="9b37f228" class="cell" data-execution_count="4">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Read and process training data</span></span>
@@ -3474,7 +3481,7 @@ Distance comparisons
 </div>
 </div>
 <div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
-<div id="76206250" class="cell" data-execution_count="5">
+<div id="803b5bcc" class="cell" data-execution_count="5">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">################################################################</span></span>
@@ -3530,13 +3537,13 @@ Distance comparisons
 </div>
 </div>
 </section>
-<section id="test-data-vs-train-data" class="level2">
-<h2 class="anchored" data-anchor-id="test-data-vs-train-data">Test data vs Train data:</h2>
+<section id="test-data-vs-train-data-1" class="level2">
+<h2 class="anchored" data-anchor-id="test-data-vs-train-data-1">Test data vs Train data:</h2>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href>DenseNet</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false" href>COSFIRE</a></li></ul>
 <div class="tab-content">
 <div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
-<div id="159a6295" class="cell" data-execution_count="6">
+<div id="d7390512" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>threshold_max_map_abs_values <span class="op">=</span> <span class="op">-</span><span class="fl">0.8</span></span>
@@ -3585,7 +3592,7 @@ Distance comparisons
 </div>
 </div>
 <div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
-<div id="b1c70f90" class="cell" data-execution_count="7">
+<div id="1868d901" class="cell" data-execution_count="7">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Read the test data</span></span>
@@ -3633,7 +3640,7 @@ Distance comparisons
 </div>
 </div>
 </div>
-<div id="c7c9a50d" class="cell" data-execution_count="8">
+<div id="ee894d5a" class="cell" data-execution_count="8">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>classes <span class="op">=</span> [<span class="st">&#39;FRII&#39;</span>, <span class="st">&#39;FRI&#39;</span>, <span class="st">&#39;Bent&#39;</span>, <span class="st">&#39;Compact&#39;</span>]</span>
@@ -3665,13 +3672,13 @@ Distance comparisons
 </details>
 </div>
 </section>
-<section id="train-data" class="level2">
-<h2 class="anchored" data-anchor-id="train-data">Train Data</h2>
+<section id="train-data-1" class="level2">
+<h2 class="anchored" data-anchor-id="train-data-1">Train Data</h2>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true" href>DenseNet</a></li></ul>
 <div class="tab-content">
 <div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
-<div id="bd4191b5" class="cell" data-execution_count="9">
+<div id="f5568d17" class="cell" data-execution_count="9">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>predictions_test <span class="op">=</span> np.loadtxt(</span>
@@ -3749,7 +3756,7 @@ Distance comparisons
 </div>
 </div>
 </div>
-<div id="53a7835c" class="cell" data-execution_count="10">
+<div id="739f5786" class="cell" data-execution_count="10">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>dist_matrix_cosfire_test_train <span class="op">=</span> hamming_distance_matrix(test_binary_cosf, train_binary_cosf)</span>
