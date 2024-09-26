@@ -3158,9 +3158,15 @@ Distance comparisons
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>df_processed_densenet <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_cosfire,lbl<span class="op">=</span><span class="st">&#39;cosfire_test_data&#39;</span>)</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_densenet,lbl<span class="op">=</span><span class="st">&#39;densenet_test_data&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_densenet,lbl<span class="op">=</span><span class="st">&#39;densenet_test_data&#39;</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>cosfire_ratio <span class="op">=</span> intra_vs_inter_class_ratio(df_processed_cosfire)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>densenet_ratio <span class="op">=</span> intra_vs_inter_class_ratio(df_processed_densenet)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;COSFIRE ratio: </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">round</span>(cosfire_ratio,<span class="dv">4</span>)<span class="sc">}</span><span class="ss">&quot;</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;DenseNet ratio: </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">round</span>(densenet_ratio,<span class="dv">4</span>)<span class="sc">}</span><span class="ss">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div id="06245e6b" class="cell quarto-layout-panel" data-execution_count="2" data-layout-ncol="2">
+<div id="1b0937e0" class="cell quarto-layout-panel" data-execution_count="2" data-layout-ncol="2">
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
 <div class="quarto-figure quarto-figure-center">
@@ -3179,69 +3185,81 @@ Distance comparisons
 </div>
 </div>
 </div>
+<div class="quarto-layout-row">
+<div class="cell-output cell-output-stdout quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<pre><code>Mean of diagonal: 2.256078
+Mean of off-diagonal: 20.726063
+Ratio (diagonal mean / off-diagonal mean): 0.108852
+Mean of diagonal: 6.938840
+Mean of off-diagonal: 42.281766
+Ratio (diagonal mean / off-diagonal mean): 0.164110
+COSFIRE ratio: 0.1089
+DenseNet ratio: 0.1641</code></pre>
+</div>
+</div>
 </div>
 <section id="cosfire" class="level3">
 <h3 class="anchored" data-anchor-id="cosfire">COSFIRE</h3>
-<div id="0c4567ef" class="cell" data-execution_count="3">
+<div id="fb9cb7b7" class="cell" data-execution_count="3">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">################################</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co">#######    COSFIRE       #######</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co">################################</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>train_df_cosfire <span class="op">=</span> pd.read_csv(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024/train_df.csv&quot;</span>)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>labels_cosfire <span class="op">=</span> train_df_cosfire[<span class="st">&#39;label_name&#39;</span>].tolist()</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>test_df_cosfire <span class="op">=</span> pd.read_csv(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024/test_df.csv&quot;</span>)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>labels_cosfire_test <span class="op">=</span> test_df_cosfire[<span class="st">&#39;label_name&#39;</span>].tolist()</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>predictions_test <span class="op">=</span> np.loadtxt(</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    os.path.join(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024&quot;</span>, <span class="st">&quot;predictions_test.out&quot;</span>),</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>predictions_train <span class="op">=</span> np.loadtxt(</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    os.path.join(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024&quot;</span>, <span class="st">&quot;predictions_train.out&quot;</span>),</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>counter <span class="op">=</span> {}</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>output_list_cosfire_test <span class="op">=</span> [<span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>counter[item]<span class="sc">}</span><span class="ss">&quot;</span> <span class="cf">if</span> item <span class="kw">in</span> counter <span class="cf">else</span> <span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_1&quot;</span> <span class="cf">for</span> item <span class="kw">in</span> labels_cosfire_test <span class="cf">for</span> counter[item] <span class="kw">in</span> (counter.setdefault(item, <span class="dv">0</span>)<span class="op">+</span><span class="dv">1</span>,)]</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the Hamming distance matrix</span></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>hamming_matrix_cosfire <span class="op">=</span> np.loadtxt(</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024/hamming_matrix_test.out&quot;</span>,</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>df_cosfire_test <span class="op">=</span> pd.DataFrame(hamming_matrix_cosfire, columns<span class="op">=</span>output_list_cosfire_test, index<span class="op">=</span>output_list_cosfire_test)</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot and save the Hamming distance matrix</span></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_cosfire_test, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming distance&#39;</span>)</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>plt.savefig(os.path.join(output_dir, <span class="st">&#39;hamming_matrix_test_cosfire.png&#39;</span>))</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>intra_class_cosfire_test <span class="op">=</span> []</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_cosfire_test, class_label)</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    intra_class_cosfire_test.append(mean_value)</span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>inter_class_cosfire_test <span class="op">=</span> []</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_cosfire_test, class_label)</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    inter_class_cosfire_test.append(mean_value)</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_cosfire_test_v2 <span class="op">=</span> []</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_cosfire_test, class_label)</span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_cosfire_test_v2.append(mean_values)</span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a>df_interclass_test_cosfire_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_cosfire_test_v2, index<span class="op">=</span>classes)</span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a>df_interclass_test_cosfire_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_cosfire_test_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">################################</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co">#######    COSFIRE       #######</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co">################################</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>train_df_cosfire <span class="op">=</span> pd.read_csv(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024/train_df.csv&quot;</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>labels_cosfire <span class="op">=</span> train_df_cosfire[<span class="st">&#39;label_name&#39;</span>].tolist()</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>test_df_cosfire <span class="op">=</span> pd.read_csv(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024/test_df.csv&quot;</span>)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>labels_cosfire_test <span class="op">=</span> test_df_cosfire[<span class="st">&#39;label_name&#39;</span>].tolist()</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>predictions_test <span class="op">=</span> np.loadtxt(</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    os.path.join(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024&quot;</span>, <span class="st">&quot;predictions_test.out&quot;</span>),</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>predictions_train <span class="op">=</span> np.loadtxt(</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    os.path.join(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024&quot;</span>, <span class="st">&quot;predictions_train.out&quot;</span>),</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>counter <span class="op">=</span> {}</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>output_list_cosfire_test <span class="op">=</span> [<span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>counter[item]<span class="sc">}</span><span class="ss">&quot;</span> <span class="cf">if</span> item <span class="kw">in</span> counter <span class="cf">else</span> <span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_1&quot;</span> <span class="cf">for</span> item <span class="kw">in</span> labels_cosfire_test <span class="cf">for</span> counter[item] <span class="kw">in</span> (counter.setdefault(item, <span class="dv">0</span>)<span class="op">+</span><span class="dv">1</span>,)]</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the Hamming distance matrix</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>hamming_matrix_cosfire <span class="op">=</span> np.loadtxt(</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024/hamming_matrix_test.out&quot;</span>,</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>df_cosfire_test <span class="op">=</span> pd.DataFrame(hamming_matrix_cosfire, columns<span class="op">=</span>output_list_cosfire_test, index<span class="op">=</span>output_list_cosfire_test)</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot and save the Hamming distance matrix</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_cosfire_test, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming distance&#39;</span>)</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>plt.savefig(os.path.join(output_dir, <span class="st">&#39;hamming_matrix_test_cosfire.png&#39;</span>))</span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>intra_class_cosfire_test <span class="op">=</span> []</span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_cosfire_test, class_label)</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>    intra_class_cosfire_test.append(mean_value)</span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>inter_class_cosfire_test <span class="op">=</span> []</span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_cosfire_test, class_label)</span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>    inter_class_cosfire_test.append(mean_value)</span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_cosfire_test_v2 <span class="op">=</span> []</span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_cosfire_test, class_label)</span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_cosfire_test_v2.append(mean_values)</span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>df_interclass_test_cosfire_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_cosfire_test_v2, index<span class="op">=</span>classes)</span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>df_interclass_test_cosfire_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_cosfire_test_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-display">
 <div>
@@ -3254,53 +3272,53 @@ Distance comparisons
 </section>
 <section id="densenet" class="level3">
 <h3 class="anchored" data-anchor-id="densenet">DenseNet</h3>
-<div id="2d86b818" class="cell" data-execution_count="4">
+<div id="cfca8381" class="cell" data-execution_count="4">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>threshold_max_map_abs_values <span class="op">=</span> <span class="op">-</span><span class="fl">0.8</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>mAP_test_abs_values,mAP_std,mAP_values1, train_binary, train_label, test_binary, test_label <span class="op">=</span> mAP_values(df_training, df_testing,thresh <span class="op">=</span> threshold_max_map_abs_values, percentile <span class="op">=</span> <span class="va">False</span>)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>hamming_matrix_densenet_test <span class="op">=</span> hamming_distance_matrix(test_binary)</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>np.savetxt(output_dir <span class="op">+</span> <span class="st">&#39;/hamming_matrix_densenet_test.out&#39;</span>, hamming_matrix_densenet_test, delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span>)</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> df_testing[<span class="st">&#39;lable_name&#39;</span>].tolist()  </span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>counter <span class="op">=</span> defaultdict(<span class="bu">int</span>)</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>output_list_densenet_test <span class="op">=</span> []</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> item <span class="kw">in</span> labels:</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    counter[item] <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    output_list_densenet_test.append(<span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>counter[item]<span class="sc">}</span><span class="ss">&quot;</span>)</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>df_densenet_test <span class="op">=</span> pd.DataFrame(hamming_matrix_densenet_test, columns<span class="op">=</span>output_list_densenet_test, index<span class="op">=</span>output_list_densenet_test)</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the overall Hamming distance matrix</span></span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_densenet_test, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>, interpolation<span class="op">=</span><span class="st">&#39;nearest&#39;</span>)</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming distance&#39;</span>)</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="co">#plt.title(&#39;Overall Hamming Distance Matrix: DenseNet (Test)&#39;)</span></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>intra_class_densenet_test <span class="op">=</span> []</span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_densenet_test, class_label)</span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    intra_class_densenet_test.append(mean_value)</span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
-<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>inter_class_densenet_test <span class="op">=</span> []</span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_densenet_test, class_label)</span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    inter_class_densenet_test.append(mean_value)</span>
-<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_densenet_test_v2 <span class="op">=</span> []</span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_densenet_test, class_label)</span>
-<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_densenet_test_v2.append(mean_values)</span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>df_interclass_test_densenet_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_densenet_test_v2, index<span class="op">=</span>classes)</span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>df_interclass_test_densenet_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_densenet_test_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>threshold_max_map_abs_values <span class="op">=</span> <span class="op">-</span><span class="fl">0.8</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>mAP_test_abs_values,mAP_std,mAP_values1, train_binary, train_label, test_binary, test_label <span class="op">=</span> mAP_values(df_training, df_testing,thresh <span class="op">=</span> threshold_max_map_abs_values, percentile <span class="op">=</span> <span class="va">False</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>hamming_matrix_densenet_test <span class="op">=</span> hamming_distance_matrix(test_binary)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>np.savetxt(output_dir <span class="op">+</span> <span class="st">&#39;/hamming_matrix_densenet_test.out&#39;</span>, hamming_matrix_densenet_test, delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> df_testing[<span class="st">&#39;lable_name&#39;</span>].tolist()  </span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>counter <span class="op">=</span> defaultdict(<span class="bu">int</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>output_list_densenet_test <span class="op">=</span> []</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> item <span class="kw">in</span> labels:</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    counter[item] <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    output_list_densenet_test.append(<span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>counter[item]<span class="sc">}</span><span class="ss">&quot;</span>)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>df_densenet_test <span class="op">=</span> pd.DataFrame(hamming_matrix_densenet_test, columns<span class="op">=</span>output_list_densenet_test, index<span class="op">=</span>output_list_densenet_test)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the overall Hamming distance matrix</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_densenet_test, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>, interpolation<span class="op">=</span><span class="st">&#39;nearest&#39;</span>)</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming distance&#39;</span>)</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="co">#plt.title(&#39;Overall Hamming Distance Matrix: DenseNet (Test)&#39;)</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>intra_class_densenet_test <span class="op">=</span> []</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_densenet_test, class_label)</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    intra_class_densenet_test.append(mean_value)</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>inter_class_densenet_test <span class="op">=</span> []</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_densenet_test, class_label)</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>    inter_class_densenet_test.append(mean_value)</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_densenet_test_v2 <span class="op">=</span> []</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_densenet_test, class_label)</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_densenet_test_v2.append(mean_values)</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>df_interclass_test_densenet_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_densenet_test_v2, index<span class="op">=</span>classes)</span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>df_interclass_test_densenet_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_densenet_test_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-display">
 <div>
@@ -3315,16 +3333,22 @@ Distance comparisons
 <div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>file_name <span class="op">=</span> <span class="st">&#39;inter_class_by_class_cosfire_test_train_v2.csv&#39;</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>df_processed_cosfire2 <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>file_name <span class="op">=</span> <span class="st">&#39;inter_class_by_class_densenet_test_train_v2.csv&#39;</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>df_processed_densenet2 <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_cosfire2,lbl<span class="op">=</span><span class="st">&#39;cosfire_test_train&#39;</span>)</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_densenet2,lbl<span class="op">=</span><span class="st">&#39;densenet_test_train&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>file_name <span class="op">=</span> <span class="st">&#39;inter_class_by_class_cosfire_test_train_v2.csv&#39;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>df_processed_cosfire2 <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>file_name <span class="op">=</span> <span class="st">&#39;inter_class_by_class_densenet_test_train_v2.csv&#39;</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>df_processed_densenet2 <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_cosfire2,lbl<span class="op">=</span><span class="st">&#39;cosfire_test_train&#39;</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_densenet2,lbl<span class="op">=</span><span class="st">&#39;densenet_test_train&#39;</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>cosfire_ratio2 <span class="op">=</span> intra_vs_inter_class_ratio(df_processed_cosfire2)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>densenet_ratio2 <span class="op">=</span> intra_vs_inter_class_ratio(df_processed_densenet2)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;COSFIRE ratio: </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">round</span>(cosfire_ratio2,<span class="dv">4</span>)<span class="sc">}</span><span class="ss">&quot;</span>)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;DenseNet ratio: </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">round</span>(densenet_ratio2,<span class="dv">4</span>)<span class="sc">}</span><span class="ss">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div id="58c1867e" class="cell quarto-layout-panel" data-execution_count="5" data-layout-ncol="2">
+<div id="b1a88d0a" class="cell quarto-layout-panel" data-execution_count="5" data-layout-ncol="2">
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
 <div class="quarto-figure quarto-figure-center">
@@ -3343,62 +3367,74 @@ Distance comparisons
 </div>
 </div>
 </div>
+<div class="quarto-layout-row">
+<div class="cell-output cell-output-stdout quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<pre><code>Mean of diagonal: 1.474163
+Mean of off-diagonal: 21.455503
+Ratio (diagonal mean / off-diagonal mean): 0.068708
+Mean of diagonal: 3.832298
+Mean of off-diagonal: 44.212726
+Ratio (diagonal mean / off-diagonal mean): 0.086679
+COSFIRE ratio: 0.0687
+DenseNet ratio: 0.0867</code></pre>
+</div>
+</div>
 </div>
 <section id="cosfire-1" class="level3">
 <h3 class="anchored" data-anchor-id="cosfire-1">COSFIRE</h3>
-<div id="c2005c1a" class="cell" data-execution_count="6">
+<div id="245ced53" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>counter <span class="op">=</span> {}</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>output_list_cosfire <span class="op">=</span> [<span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>counter[item]<span class="sc">}</span><span class="ss">&quot;</span> <span class="cf">if</span> item <span class="kw">in</span> counter <span class="cf">else</span> <span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_1&quot;</span> <span class="cf">for</span> item <span class="kw">in</span> labels_cosfire <span class="cf">for</span> counter[item] <span class="kw">in</span> (counter.setdefault(item, <span class="dv">0</span>)<span class="op">+</span><span class="dv">1</span>,)]</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the Hamming distance matrix</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>hamming_matrix_cosfire <span class="op">=</span> np.loadtxt(</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024/hamming_matrix_cosfire.out&quot;</span>,</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>df_cosfire <span class="op">=</span> pd.DataFrame(hamming_matrix_cosfire, columns<span class="op">=</span>output_list_cosfire, index<span class="op">=</span>output_list_cosfire)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>test_df_cosfire[<span class="st">&#39;predictions&#39;</span>] <span class="op">=</span> <span class="bu">list</span>(predictions_test)</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co"># test_df_cosfire[&#39;predictions&#39;] = test_df_cosfire[&#39;predictions&#39;].apply(lambda x: np.array(ast.literal_eval(x)))</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>train_df_cosfire[<span class="st">&#39;predictions&#39;</span>] <span class="op">=</span> <span class="bu">list</span>(predictions_train)</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co"># train_df_cosfire[&#39;predictions&#39;] = train_df_cosfire[&#39;predictions&#39;].apply(lambda x: np.array(ast.literal_eval(x)))</span></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>threshold_max_map_abs_values <span class="op">=</span> <span class="op">-</span><span class="fl">0.20000000000000018</span></span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>mAP_test_abs_values_cosf,mAP_std_cosf,mAP_values_cosf, train_binary_cosf, train_label_cosf, test_binary_cosf, test_label_cosf <span class="op">=</span> mAP_values(train_df_cosfire, test_df_cosfire,thresh <span class="op">=</span> threshold_max_map_abs_values, percentile <span class="op">=</span> <span class="va">False</span>)</span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>dist_matrix_cosfire_test_train <span class="op">=</span> hamming_distance_matrix_v2(test_binary_cosf, train_binary_cosf)</span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>df_test_train_cosfire <span class="op">=</span> pd.DataFrame(dist_matrix_cosfire_test_train, columns<span class="op">=</span>output_list_cosfire, index<span class="op">=</span>output_list_cosfire_test)</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>intra_class_cosfire_test_train <span class="op">=</span> []</span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_test_train_cosfire, class_label)</span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>    intra_class_cosfire_test_train.append(mean_value)</span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>inter_class_cosfire_test_train <span class="op">=</span> []</span>
-<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_test_train_cosfire, class_label)</span>
-<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>    inter_class_cosfire_test_train.append(mean_value)</span>
-<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_cosfire_test_train_v2 <span class="op">=</span> []</span>
-<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_test_train_cosfire, class_label)</span>
-<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_cosfire_test_train_v2.append(mean_values)</span>
-<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>df_interclass_test_train_cosfire_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_cosfire_test_train_v2, index<span class="op">=</span>classes)</span>
-<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>df_interclass_test_train_cosfire_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_cosfire_test_train_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
-<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_test_train_cosfire, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
-<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming Distance&#39;</span>)</span>
-<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">&#39;Train&#39;</span>)</span>
-<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">&#39;Test&#39;</span>)</span>
-<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>counter <span class="op">=</span> {}</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>output_list_cosfire <span class="op">=</span> [<span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>counter[item]<span class="sc">}</span><span class="ss">&quot;</span> <span class="cf">if</span> item <span class="kw">in</span> counter <span class="cf">else</span> <span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_1&quot;</span> <span class="cf">for</span> item <span class="kw">in</span> labels_cosfire <span class="cf">for</span> counter[item] <span class="kw">in</span> (counter.setdefault(item, <span class="dv">0</span>)<span class="op">+</span><span class="dv">1</span>,)]</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the Hamming distance matrix</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>hamming_matrix_cosfire <span class="op">=</span> np.loadtxt(</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024/hamming_matrix_cosfire.out&quot;</span>,</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>df_cosfire <span class="op">=</span> pd.DataFrame(hamming_matrix_cosfire, columns<span class="op">=</span>output_list_cosfire, index<span class="op">=</span>output_list_cosfire)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>test_df_cosfire[<span class="st">&#39;predictions&#39;</span>] <span class="op">=</span> <span class="bu">list</span>(predictions_test)</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co"># test_df_cosfire[&#39;predictions&#39;] = test_df_cosfire[&#39;predictions&#39;].apply(lambda x: np.array(ast.literal_eval(x)))</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>train_df_cosfire[<span class="st">&#39;predictions&#39;</span>] <span class="op">=</span> <span class="bu">list</span>(predictions_train)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="co"># train_df_cosfire[&#39;predictions&#39;] = train_df_cosfire[&#39;predictions&#39;].apply(lambda x: np.array(ast.literal_eval(x)))</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>threshold_max_map_abs_values <span class="op">=</span> <span class="op">-</span><span class="fl">0.20000000000000018</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>mAP_test_abs_values_cosf,mAP_std_cosf,mAP_values_cosf, train_binary_cosf, train_label_cosf, test_binary_cosf, test_label_cosf <span class="op">=</span> mAP_values(train_df_cosfire, test_df_cosfire,thresh <span class="op">=</span> threshold_max_map_abs_values, percentile <span class="op">=</span> <span class="va">False</span>)</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>dist_matrix_cosfire_test_train <span class="op">=</span> hamming_distance_matrix_v2(test_binary_cosf, train_binary_cosf)</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>df_test_train_cosfire <span class="op">=</span> pd.DataFrame(dist_matrix_cosfire_test_train, columns<span class="op">=</span>output_list_cosfire, index<span class="op">=</span>output_list_cosfire_test)</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>intra_class_cosfire_test_train <span class="op">=</span> []</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_test_train_cosfire, class_label)</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    intra_class_cosfire_test_train.append(mean_value)</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>inter_class_cosfire_test_train <span class="op">=</span> []</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_test_train_cosfire, class_label)</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>    inter_class_cosfire_test_train.append(mean_value)</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_cosfire_test_train_v2 <span class="op">=</span> []</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_test_train_cosfire, class_label)</span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_cosfire_test_train_v2.append(mean_values)</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>df_interclass_test_train_cosfire_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_cosfire_test_train_v2, index<span class="op">=</span>classes)</span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>df_interclass_test_train_cosfire_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_cosfire_test_train_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_test_train_cosfire, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming Distance&#39;</span>)</span>
+<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">&#39;Train&#39;</span>)</span>
+<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">&#39;Test&#39;</span>)</span>
+<span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-display">
 <div>
@@ -3411,47 +3447,47 @@ Distance comparisons
 </section>
 <section id="densenet-1" class="level3">
 <h3 class="anchored" data-anchor-id="densenet-1">DenseNet</h3>
-<div id="47dcd109" class="cell" data-execution_count="7">
+<div id="4583660d" class="cell" data-execution_count="7">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> df_training[<span class="st">&#39;lable_name&#39;</span>].tolist()  </span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>counter <span class="op">=</span> defaultdict(<span class="bu">int</span>)</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>output_list_densenet <span class="op">=</span> []</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> item <span class="kw">in</span> labels:</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    counter[item] <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    output_list_densenet.append(<span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>counter[item]<span class="sc">}</span><span class="ss">&quot;</span>)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>dist_matrix_densent_test_train <span class="op">=</span> hamming_distance_matrix_v2(test_binary, train_binary)</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>df_test_train <span class="op">=</span> pd.DataFrame(dist_matrix_densent_test_train, columns<span class="op">=</span>output_list_densenet, index<span class="op">=</span>output_list_densenet_test)</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>intra_class_densenet_test_train <span class="op">=</span> []</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_test_train, class_label)</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    intra_class_densenet_test_train.append(mean_value)</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>inter_class_densenet_test_train <span class="op">=</span> []</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_test_train, class_label)</span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    inter_class_densenet_test_train.append(mean_value)</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_densenet_test_train_v2 <span class="op">=</span> []</span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_test_train, class_label)</span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_densenet_test_train_v2.append(mean_values)</span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>df_interclass_test_train_densenet_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_densenet_test_train_v2, index<span class="op">=</span>classes)</span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>df_interclass_test_train_densenet_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_densenet_test_train_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
-<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_test_train, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
-<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming Distance&#39;</span>)</span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">&#39;Train&#39;</span>)</span>
-<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">&#39;Test&#39;</span>)</span>
-<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>labels <span class="op">=</span> df_training[<span class="st">&#39;lable_name&#39;</span>].tolist()  </span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>counter <span class="op">=</span> defaultdict(<span class="bu">int</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>output_list_densenet <span class="op">=</span> []</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> item <span class="kw">in</span> labels:</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    counter[item] <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    output_list_densenet.append(<span class="ss">f&quot;</span><span class="sc">{</span>item<span class="sc">}</span><span class="ss">_</span><span class="sc">{</span>counter[item]<span class="sc">}</span><span class="ss">&quot;</span>)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>dist_matrix_densent_test_train <span class="op">=</span> hamming_distance_matrix_v2(test_binary, train_binary)</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>df_test_train <span class="op">=</span> pd.DataFrame(dist_matrix_densent_test_train, columns<span class="op">=</span>output_list_densenet, index<span class="op">=</span>output_list_densenet_test)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>intra_class_densenet_test_train <span class="op">=</span> []</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_test_train, class_label)</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    intra_class_densenet_test_train.append(mean_value)</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>inter_class_densenet_test_train <span class="op">=</span> []</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_test_train, class_label)</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    inter_class_densenet_test_train.append(mean_value)</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_densenet_test_train_v2 <span class="op">=</span> []</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_test_train, class_label)</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_densenet_test_train_v2.append(mean_values)</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>df_interclass_test_train_densenet_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_densenet_test_train_v2, index<span class="op">=</span>classes)</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>df_interclass_test_train_densenet_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_densenet_test_train_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_test_train, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming Distance&#39;</span>)</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">&#39;Train&#39;</span>)</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">&#39;Test&#39;</span>)</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-display">
 <div>
@@ -3466,16 +3502,22 @@ Distance comparisons
 <div id="tabset-1-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-3-tab">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>file_name <span class="op">=</span> <span class="st">&#39;inter_class_by_class_cosfire_train_v2.csv&#39;</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>df_processed_cosfire_v2 <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>file_name <span class="op">=</span> <span class="st">&#39;inter_class_by_class_densenet_train_v2.csv&#39;</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>df_processed_densenet_v2 <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_cosfire_v2,lbl<span class="op">=</span><span class="st">&#39;cosfire_train_data&#39;</span>)</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_densenet_v2,lbl<span class="op">=</span><span class="st">&#39;densenet_train_data&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>file_name <span class="op">=</span> <span class="st">&#39;inter_class_by_class_cosfire_train_v2.csv&#39;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>df_processed_cosfire_v2 <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>file_name <span class="op">=</span> <span class="st">&#39;inter_class_by_class_densenet_train_v2.csv&#39;</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>df_processed_densenet_v2 <span class="op">=</span> load_and_preprocess_data(<span class="ss">f&quot;</span><span class="sc">{</span>output_dir<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>file_name<span class="sc">}</span><span class="ss">&quot;</span>, classes)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_cosfire_v2,lbl<span class="op">=</span><span class="st">&#39;cosfire_train_data&#39;</span>)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>create_heatmap(df_processed_densenet_v2,lbl<span class="op">=</span><span class="st">&#39;densenet_train_data&#39;</span>)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>cosfire_ratio_v2 <span class="op">=</span> intra_vs_inter_class_ratio(df_processed_cosfire_v2)</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>densenet_ratio_v2 <span class="op">=</span> intra_vs_inter_class_ratio(df_processed_densenet_v2)</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;COSFIRE ratio: </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">round</span>(cosfire_ratio_v2,<span class="dv">4</span>)<span class="sc">}</span><span class="ss">&quot;</span>)</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;DenseNet ratio: </span><span class="sc">{</span>np<span class="sc">.</span><span class="bu">round</span>(densenet_ratio_v2,<span class="dv">4</span>)<span class="sc">}</span><span class="ss">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div id="311956ba" class="cell quarto-layout-panel" data-execution_count="8" data-layout-ncol="2">
+<div id="5596b2a7" class="cell quarto-layout-panel" data-execution_count="8" data-layout-ncol="2">
 <div class="quarto-layout-row">
 <div class="quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
 <div class="quarto-figure quarto-figure-center">
@@ -3494,42 +3536,54 @@ Distance comparisons
 </div>
 </div>
 </div>
+<div class="quarto-layout-row">
+<div class="cell-output cell-output-stdout quarto-layout-cell" style="flex-basis: 50.0%;justify-content: flex-start;">
+<pre><code>Mean of diagonal: 0.603129
+Mean of off-diagonal: 21.532097
+Ratio (diagonal mean / off-diagonal mean): 0.028011
+Mean of diagonal: 0.078702
+Mean of off-diagonal: 44.973643
+Ratio (diagonal mean / off-diagonal mean): 0.001750
+COSFIRE ratio: 0.028
+DenseNet ratio: 0.0017</code></pre>
+</div>
+</div>
 </div>
 <section id="cosfire-2" class="level3">
 <h3 class="anchored" data-anchor-id="cosfire-2">COSFIRE</h3>
-<div id="d842ea83" class="cell" data-execution_count="9">
+<div id="3b6f706b" class="cell" data-execution_count="9">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the overall Hamming distance matrix</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_cosfire, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>, interpolation<span class="op">=</span><span class="st">&#39;nearest&#39;</span>)</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming distance&#39;</span>)</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co">#plt.title(&#39;Overall Hamming Distance Matrix: COSFIRE&#39;)</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Process each class and collect intra-class mean distances</span></span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>intra_class_cosfire <span class="op">=</span> []</span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_cosfire, class_label)</span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    intra_class_cosfire.append(mean_value)</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>inter_class_cosfire <span class="op">=</span> []</span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_cosfire, class_label)</span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    inter_class_cosfire.append(mean_value)</span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_cosfire_train_v2 <span class="op">=</span> []</span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_cosfire, class_label)</span>
-<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_cosfire_train_v2.append(mean_values)</span>
-<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>df_interclass_train_cosfire_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_cosfire_train_v2, index<span class="op">=</span>classes)</span>
-<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>df_interclass_train_cosfire_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_cosfire_train_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the overall Hamming distance matrix</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>plt.imshow(df_cosfire, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>, interpolation<span class="op">=</span><span class="st">&#39;nearest&#39;</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming distance&#39;</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="co">#plt.title(&#39;Overall Hamming Distance Matrix: COSFIRE&#39;)</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Process each class and collect intra-class mean distances</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>intra_class_cosfire <span class="op">=</span> []</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_cosfire, class_label)</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    intra_class_cosfire.append(mean_value)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>inter_class_cosfire <span class="op">=</span> []</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_cosfire, class_label)</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>    inter_class_cosfire.append(mean_value)</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_cosfire_train_v2 <span class="op">=</span> []</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_cosfire, class_label)</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_cosfire_train_v2.append(mean_values)</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>df_interclass_train_cosfire_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_cosfire_train_v2, index<span class="op">=</span>classes)</span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>df_interclass_train_cosfire_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_cosfire_train_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-display">
 <div>
@@ -3542,52 +3596,52 @@ Distance comparisons
 </section>
 <section id="densenet-2" class="level3">
 <h3 class="anchored" data-anchor-id="densenet-2">DenseNet</h3>
-<div id="8e962018" class="cell" data-execution_count="10">
+<div id="52e2302a" class="cell" data-execution_count="10">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>hamming_matrix_densenet <span class="op">=</span> np.loadtxt(</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    os.path.join(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024&quot;</span>, <span class="st">&quot;hamming_matrix_densenet.out&quot;</span>),</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot and save the Hamming distance matrix</span></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>plt.imshow(hamming_matrix_densenet, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming distance&#39;</span>)</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>plt.savefig(os.path.join(output_dir, <span class="st">&#39;hamming_matrix_densenet.png&#39;</span>))</span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a DataFrame with the Hamming matrix and set labels</span></span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>df_densenet <span class="op">=</span> pd.DataFrame(hamming_matrix_densenet, columns<span class="op">=</span>output_list_densenet, index<span class="op">=</span>output_list_densenet)</span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="co"># List of classes to process</span></span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>classes <span class="op">=</span> [<span class="st">&#39;FRII&#39;</span>, <span class="st">&#39;FRI&#39;</span>, <span class="st">&#39;Bent&#39;</span>, <span class="st">&#39;Compact&#39;</span>]</span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Process each class and collect intra-class mean distances</span></span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>intra_class_densenet <span class="op">=</span> []</span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
-<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_densenet, class_label)</span>
-<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>    intra_class_densenet.append(mean_value)</span>
-<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
-<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>inter_class_densenet <span class="op">=</span> []</span>
-<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_densenet, class_label)</span>
-<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>    inter_class_densenet.append(mean_value)</span>
-<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_densenet_train_v2 <span class="op">=</span> []</span>
-<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
-<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_densenet, class_label)</span>
-<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_densenet_train_v2.append(mean_values)</span>
-<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>df_interclass_train_densenet_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_densenet_train_v2, index<span class="op">=</span>classes)</span>
-<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a>df_interclass_train_densenet_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_densenet_train_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>hamming_matrix_densenet <span class="op">=</span> np.loadtxt(</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    os.path.join(<span class="st">&quot;IMR_DNT161_model_data_complete_Sat_Sep_21_15_12_23_2024&quot;</span>, <span class="st">&quot;hamming_matrix_densenet.out&quot;</span>),</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    delimiter<span class="op">=</span><span class="st">&#39;,&#39;</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot and save the Hamming distance matrix</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">8</span>))</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>plt.imshow(hamming_matrix_densenet, cmap<span class="op">=</span><span class="st">&#39;viridis&#39;</span>)</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>plt.colorbar(label<span class="op">=</span><span class="st">&#39;Hamming distance&#39;</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>plt.savefig(os.path.join(output_dir, <span class="st">&#39;hamming_matrix_densenet.png&#39;</span>))</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a DataFrame with the Hamming matrix and set labels</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>df_densenet <span class="op">=</span> pd.DataFrame(hamming_matrix_densenet, columns<span class="op">=</span>output_list_densenet, index<span class="op">=</span>output_list_densenet)</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a><span class="co"># List of classes to process</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>classes <span class="op">=</span> [<span class="st">&#39;FRII&#39;</span>, <span class="st">&#39;FRI&#39;</span>, <span class="st">&#39;Bent&#39;</span>, <span class="st">&#39;Compact&#39;</span>]</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Process each class and collect intra-class mean distances</span></span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>intra_class_densenet <span class="op">=</span> []</span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a><span class="co">#print(&#39;Plotting individual classes:&#39;)</span></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> process_class(df_densenet, class_label)</span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>    intra_class_densenet.append(mean_value)</span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute inter-class mean distances for each class</span></span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>inter_class_densenet <span class="op">=</span> []</span>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>    mean_value <span class="op">=</span> compute_inter_class_mean(df_densenet, class_label)</span>
+<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a>    inter_class_densenet.append(mean_value)</span>
+<span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-36"><a href="#cb12-36" aria-hidden="true" tabindex="-1"></a>inter_class_by_class_densenet_train_v2 <span class="op">=</span> []</span>
+<span id="cb12-37"><a href="#cb12-37" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> class_label <span class="kw">in</span> classes:</span>
+<span id="cb12-38"><a href="#cb12-38" aria-hidden="true" tabindex="-1"></a>    mean_values <span class="op">=</span> compute_inter_class_mean_class_by_class(df_densenet, class_label)</span>
+<span id="cb12-39"><a href="#cb12-39" aria-hidden="true" tabindex="-1"></a>    inter_class_by_class_densenet_train_v2.append(mean_values)</span>
+<span id="cb12-40"><a href="#cb12-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-41"><a href="#cb12-41" aria-hidden="true" tabindex="-1"></a>df_interclass_train_densenet_v2 <span class="op">=</span> pd.DataFrame(inter_class_by_class_densenet_train_v2, index<span class="op">=</span>classes)</span>
+<span id="cb12-42"><a href="#cb12-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-43"><a href="#cb12-43" aria-hidden="true" tabindex="-1"></a>df_interclass_train_densenet_v2.to_csv(output_dir <span class="op">+</span> <span class="st">&#39;/inter_class_by_class_densenet_train_v2.csv&#39;</span>,index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-display">
 <div>
@@ -3597,45 +3651,45 @@ Distance comparisons
 </div>
 </div>
 </div>
-<div id="d4a4a4c8" class="cell" data-execution_count="11">
+<div id="3cf0ab5f" class="cell" data-execution_count="11">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>data_test <span class="op">=</span> {<span class="st">&#39;Galaxy type&#39;</span>: classes,</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>        <span class="st">&#39;Size&#39;</span>: [test_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRII&#39;&quot;</span>).shape[<span class="dv">0</span>], test_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRI&#39;&quot;</span>).shape[<span class="dv">0</span>], test_df_cosfire.query(<span class="st">&quot;label_name==&#39;Bent&#39;&quot;</span>).shape[<span class="dv">0</span>],test_df_cosfire.query(<span class="st">&quot;label_name==&#39;Compact&#39;&quot;</span>).shape[<span class="dv">0</span>]],</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_cosfire&#39;</span>: intra_class_cosfire_test,</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_densenet&#39;</span>: intra_class_densenet_test,</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_cosfire&#39;</span>: inter_class_cosfire_test,</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_densenet&#39;</span>: inter_class_densenet_test,           </span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>            </span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>            }</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>df_results_test <span class="op">=</span> pd.DataFrame(data_test)</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>df_results_test.to_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances_test.csv&#39;</span>, index<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> {<span class="st">&#39;Galaxy type&#39;</span>: classes,</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">&#39;Size&#39;</span>: [train_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRII&#39;&quot;</span>).shape[<span class="dv">0</span>], train_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRI&#39;&quot;</span>).shape[<span class="dv">0</span>], train_df_cosfire.query(<span class="st">&quot;label_name==&#39;Bent&#39;&quot;</span>).shape[<span class="dv">0</span>],train_df_cosfire.query(<span class="st">&quot;label_name==&#39;Compact&#39;&quot;</span>).shape[<span class="dv">0</span>]],</span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_cosfire&#39;</span>: intra_class_cosfire,</span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_densenet&#39;</span>: intra_class_densenet,</span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_cosfire&#39;</span>: inter_class_cosfire,</span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_densenet&#39;</span>: inter_class_densenet,           </span>
-<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>            </span>
-<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>            }</span>
-<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>df_results <span class="op">=</span> pd.DataFrame(data)</span>
-<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>df_results.to_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances.csv&#39;</span>, index<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>data_test_train <span class="op">=</span> {<span class="st">&#39;Galaxy type&#39;</span>: classes,</span>
-<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>        <span class="st">&#39;Size&#39;</span>: [train_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRII&#39;&quot;</span>).shape[<span class="dv">0</span>], train_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRI&#39;&quot;</span>).shape[<span class="dv">0</span>], train_df_cosfire.query(<span class="st">&quot;label_name==&#39;Bent&#39;&quot;</span>).shape[<span class="dv">0</span>],train_df_cosfire.query(<span class="st">&quot;label_name==&#39;Compact&#39;&quot;</span>).shape[<span class="dv">0</span>]],</span>
-<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_cosfire&#39;</span>: intra_class_cosfire_test_train,</span>
-<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_densenet&#39;</span>: intra_class_densenet_test_train,</span>
-<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_cosfire&#39;</span>: inter_class_cosfire_test_train,</span>
-<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_densenet&#39;</span>: inter_class_densenet_test_train,           </span>
-<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>            </span>
-<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>            }</span>
-<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>df_results_test_train <span class="op">=</span> pd.DataFrame(data_test_train)</span>
-<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>df_results_test_train.to_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances_test_train.csv&#39;</span>, index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>data_test <span class="op">=</span> {<span class="st">&#39;Galaxy type&#39;</span>: classes,</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>        <span class="st">&#39;Size&#39;</span>: [test_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRII&#39;&quot;</span>).shape[<span class="dv">0</span>], test_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRI&#39;&quot;</span>).shape[<span class="dv">0</span>], test_df_cosfire.query(<span class="st">&quot;label_name==&#39;Bent&#39;&quot;</span>).shape[<span class="dv">0</span>],test_df_cosfire.query(<span class="st">&quot;label_name==&#39;Compact&#39;&quot;</span>).shape[<span class="dv">0</span>]],</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_cosfire&#39;</span>: intra_class_cosfire_test,</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_densenet&#39;</span>: intra_class_densenet_test,</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_cosfire&#39;</span>: inter_class_cosfire_test,</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_densenet&#39;</span>: inter_class_densenet_test,           </span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>            }</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>df_results_test <span class="op">=</span> pd.DataFrame(data_test)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>df_results_test.to_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances_test.csv&#39;</span>, index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> {<span class="st">&#39;Galaxy type&#39;</span>: classes,</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">&#39;Size&#39;</span>: [train_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRII&#39;&quot;</span>).shape[<span class="dv">0</span>], train_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRI&#39;&quot;</span>).shape[<span class="dv">0</span>], train_df_cosfire.query(<span class="st">&quot;label_name==&#39;Bent&#39;&quot;</span>).shape[<span class="dv">0</span>],train_df_cosfire.query(<span class="st">&quot;label_name==&#39;Compact&#39;&quot;</span>).shape[<span class="dv">0</span>]],</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_cosfire&#39;</span>: intra_class_cosfire,</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_densenet&#39;</span>: intra_class_densenet,</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_cosfire&#39;</span>: inter_class_cosfire,</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_densenet&#39;</span>: inter_class_densenet,           </span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>            }</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>df_results <span class="op">=</span> pd.DataFrame(data)</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>df_results.to_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances.csv&#39;</span>, index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>data_test_train <span class="op">=</span> {<span class="st">&#39;Galaxy type&#39;</span>: classes,</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>        <span class="st">&#39;Size&#39;</span>: [train_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRII&#39;&quot;</span>).shape[<span class="dv">0</span>], train_df_cosfire.query(<span class="st">&quot;label_name==&#39;FRI&#39;&quot;</span>).shape[<span class="dv">0</span>], train_df_cosfire.query(<span class="st">&quot;label_name==&#39;Bent&#39;&quot;</span>).shape[<span class="dv">0</span>],train_df_cosfire.query(<span class="st">&quot;label_name==&#39;Compact&#39;&quot;</span>).shape[<span class="dv">0</span>]],</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_cosfire&#39;</span>: intra_class_cosfire_test_train,</span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;intra_class_densenet&#39;</span>: intra_class_densenet_test_train,</span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_cosfire&#39;</span>: inter_class_cosfire_test_train,</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>            <span class="st">&#39;inter_class_densenet&#39;</span>: inter_class_densenet_test_train,           </span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>            }</span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a>df_results_test_train <span class="op">=</span> pd.DataFrame(data_test_train)</span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a>df_results_test_train.to_csv(output_dir <span class="op">+</span><span class="st">&#39;/intra_and_intra_class_distances_test_train.csv&#39;</span>, index<span class="op">=</span><span class="va">False</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </section>
